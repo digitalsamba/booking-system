@@ -417,22 +417,53 @@ class BookingModel extends BaseModel {
     /**
      * Format booking data for API response
      *
-     * @param array $booking Raw booking data from MongoDB
+     * @param array|object $booking Raw booking data from MongoDB
      * @return array Formatted booking
      */
     protected function formatBooking($booking): array {
+        // Convert to array if object
+        if (is_object($booking)) {
+            $booking = (array)$booking;
+        }
+        
         $result = [
-            'id' => (string) $booking['_id'],
-            'provider_id' => (string) $booking['provider_id'],
-            'slot_id' => (string) $booking['slot_id'],
-            'customer' => $booking['customer'],
+            'id' => (string)($booking['_id'] ?? ''),
+            'provider_id' => (string)($booking['provider_id'] ?? ''),
+            'customer' => $booking['customer'] ?? [],
             'notes' => $booking['notes'] ?? '',
             'status' => $booking['status'] ?? 'confirmed',
-            'start_time' => $booking['start_time'] ?? null,
-            'end_time' => $booking['end_time'] ?? null,
-            'created_at' => isset($booking['created_at']) ? $booking['created_at']->toDateTime()->format('Y-m-d H:i:s') : null,
-            'updated_at' => isset($booking['updated_at']) ? $booking['updated_at']->toDateTime()->format('Y-m-d H:i:s') : null
         ];
+        
+        // Add slot_id if exists
+        if (isset($booking['slot_id'])) {
+            $result['slot_id'] = (string)$booking['slot_id'];
+        }
+        
+        // Process date fields
+        $dateFields = ['start_time', 'end_time', 'date', 'created_at', 'updated_at'];
+        foreach ($dateFields as $field) {
+            if (isset($booking[$field])) {
+                if ($booking[$field] instanceof \MongoDB\BSON\UTCDateTime) {
+                    // Convert MongoDB UTCDateTime to string
+                    $result[$field] = $booking[$field]->toDateTime()->format('Y-m-d\TH:i:s');
+                } else {
+                    $result[$field] = $booking[$field];
+                }
+            }
+        }
+        
+        // Add any additional fields
+        foreach ($booking as $key => $value) {
+            if (!isset($result[$key]) && $key !== '_id') {
+                if ($value instanceof \MongoDB\BSON\UTCDateTime) {
+                    $result[$key] = $value->toDateTime()->format('Y-m-d\TH:i:s');
+                } else if ($value instanceof \MongoDB\BSON\ObjectId) {
+                    $result[$key] = (string)$value;
+                } else {
+                    $result[$key] = $value;
+                }
+            }
+        }
         
         return $result;
     }
@@ -469,13 +500,13 @@ class BookingModel extends BaseModel {
      * Get bookings with filtering, pagination and sorting
      * 
      * @param array $filter Filter criteria
-     * @param int $page Page number (default: 1)
-     * @param int $limit Items per page (default: 20)
-     * @return array List of bookings
+     * @param int $page Page number
+     * @param int $limit Items per page
+     * @return array List of bookings and pagination info
      */
     public function getBookings($filter = [], $page = 1, $limit = 20) {
         try {
-            // Ensure $limit is at least 1 to prevent division by zero
+            // Ensure $limit and $page are valid
             $limit = max(1, (int)$limit);
             $page = max(1, (int)$page);
             
@@ -484,14 +515,27 @@ class BookingModel extends BaseModel {
             
             // Apply filters
             if (!empty($filter)) {
-                // Provider filter
+                // Provider filter - convert string ID to MongoDB ObjectId
                 if (isset($filter['provider_id'])) {
-                    $query['provider_id'] = $filter['provider_id'];
-                }
-                
-                // Client filter
-                if (isset($filter['client_id'])) {
-                    $query['client_id'] = $filter['client_id'];
+                    $providerId = $filter['provider_id'];
+                    
+                    // Debug log
+                    error_log("Original provider_id filter value: " . json_encode($providerId));
+                    
+                    // Handle provider_id as MongoDB ObjectId
+                    if (is_string($providerId) && strlen($providerId) === 24) {
+                        try {
+                            $query['provider_id'] = new \MongoDB\BSON\ObjectId($providerId);
+                            error_log("Converted provider_id to MongoDB ObjectId");
+                        } catch (\Exception $e) {
+                            error_log("Failed to convert provider_id to ObjectId: " . $e->getMessage());
+                            // Fallback to string comparison
+                            $query['provider_id'] = $providerId;
+                        }
+                    } else {
+                        // Use as is
+                        $query['provider_id'] = $providerId;
+                    }
                 }
                 
                 // Status filter
@@ -504,26 +548,19 @@ class BookingModel extends BaseModel {
                     $dateQuery = [];
                     
                     if (isset($filter['date_range']['start'])) {
-                        // Convert to MongoDB UTCDateTime if needed
                         $startDate = $filter['date_range']['start'];
-                        if (is_string($startDate)) {
-                            $startDateTime = new \DateTime($startDate);
-                            $dateQuery['$gte'] = new \MongoDB\BSON\UTCDateTime($startDateTime->getTimestamp() * 1000);
-                        } else {
-                            $dateQuery['$gte'] = $startDate;
-                        }
+                        $startDateTime = new \DateTime($startDate);
+                        $startDateTime->setTime(0, 0, 0);
+                        $dateQuery['$gte'] = new \MongoDB\BSON\UTCDateTime($startDateTime->getTimestamp() * 1000);
+                        error_log("Start date filter: " . $startDateTime->format('Y-m-d H:i:s'));
                     }
                     
                     if (isset($filter['date_range']['end'])) {
-                        // Convert to MongoDB UTCDateTime if needed
                         $endDate = $filter['date_range']['end'];
-                        if (is_string($endDate)) {
-                            $endDateTime = new \DateTime($endDate);
-                            $endDateTime->setTime(23, 59, 59); // End of day
-                            $dateQuery['$lte'] = new \MongoDB\BSON\UTCDateTime($endDateTime->getTimestamp() * 1000);
-                        } else {
-                            $dateQuery['$lte'] = $endDate;
-                        }
+                        $endDateTime = new \DateTime($endDate);
+                        $endDateTime->setTime(23, 59, 59);
+                        $dateQuery['$lte'] = new \MongoDB\BSON\UTCDateTime($endDateTime->getTimestamp() * 1000);
+                        error_log("End date filter: " . $endDateTime->format('Y-m-d H:i:s'));
                     }
                     
                     if (!empty($dateQuery)) {
@@ -532,42 +569,36 @@ class BookingModel extends BaseModel {
                 }
             }
             
-            error_log("Query filter for bookings: " . json_encode($query));
+            // Add debug logging
+            error_log("Final MongoDB query: " . json_encode($query));
+            
+            // Get total count
+            $totalCount = $this->collection->countDocuments($query);
+            error_log("Total matching documents: " . $totalCount);
             
             // Calculate skip value for pagination
             $skip = ($page - 1) * $limit;
             
-            // Get total count for pagination info
-            if (method_exists($this->collection, 'countDocuments')) {
-                $totalCount = $this->collection->countDocuments($query);
-            } else if (method_exists($this->collection, 'count')) {
-                $totalCount = $this->collection->count($query);
-            } else {
-                // Manual counting if neither method is available
-                $countCursor = $this->collection->find($query);
-                $totalCount = iterator_count($countCursor);
-            }
-            
-            // Ensure $totalCount is numeric
-            $totalCount = (int)$totalCount;
-            
-            // Get paginated results using options
+            // Define options for find
             $options = [
                 'skip' => $skip,
                 'limit' => $limit,
-                'sort' => ['start_time' => -1]  // Sort by date descending
+                'sort' => ['start_time' => -1]
             ];
             
+            // Get bookings
             $cursor = $this->collection->find($query, $options);
-            
-            // Convert cursor to array
             $bookings = [];
+            $count = 0;
+            
             foreach ($cursor as $document) {
-                $bookings[] = $this->formatBooking($document);
+                $count++;
+                $booking = $this->formatBooking($document);
+                error_log("Processing booking ID: " . ($booking['id'] ?? 'unknown'));
+                $bookings[] = $booking;
             }
             
-            // Calculate pages, ensuring no division by zero
-            $pages = ($limit > 0) ? ceil($totalCount / $limit) : 0;
+            error_log("Retrieved {$count} booking documents");
             
             return [
                 'items' => $bookings,
@@ -575,7 +606,7 @@ class BookingModel extends BaseModel {
                     'total' => $totalCount,
                     'page' => $page,
                     'limit' => $limit,
-                    'pages' => $pages
+                    'pages' => ceil($totalCount / $limit)
                 ]
             ];
         } catch (\Exception $e) {

@@ -69,6 +69,8 @@ class BookingController extends BaseController {
             return;
         }
         
+        error_log("Authenticated user ID: " . $this->userId);
+        
         // Get query parameters
         $startDate = $_GET['start_date'] ?? null;
         $endDate = $_GET['end_date'] ?? null;
@@ -95,9 +97,14 @@ class BookingController extends BaseController {
             $filter['status'] = $status;
         }
         
+        error_log("Fetching bookings with filter: " . json_encode($filter));
+        
         try {
             // Get bookings
             $result = $this->bookingModel->getBookings($filter, $page, $limit);
+            
+            // Add debugging info
+            error_log("Retrieved " . count($result['items']) . " bookings");
             
             // Return response - pass the entire result with items and pagination
             Response::json($result);

@@ -744,5 +744,84 @@
             checkStoredAuth();
         };
     </script>
+
+    <div style="margin-top: 40px; padding: 20px; border-top: 1px solid #ccc;">
+        <h3>Debug Controls</h3>
+        <div>
+            <button id="debug-show-token">Show Auth Token</button>
+            <button id="debug-get-raw-data">Get Raw Booking Data</button>
+        </div>
+        <div id="debug-output" style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; display: none; white-space: pre-wrap; font-family: monospace; max-height: 300px; overflow: auto;">
+        </div>
+    </div>
+
+    <script>
+    // Add these functions to your JavaScript
+    document.getElementById('debug-show-token').addEventListener('click', function() {
+        const output = document.getElementById('debug-output');
+        output.style.display = 'block';
+        
+        if (!authData.token) {
+            output.textContent = "No authentication token found!";
+            return;
+        }
+        
+        const tokenParts = authData.token.split('.');
+        if (tokenParts.length !== 3) {
+            output.textContent = "Invalid token format: " + authData.token;
+            return;
+        }
+        
+        try {
+            // Decode the payload (middle part)
+            const payload = JSON.parse(atob(tokenParts[1]));
+            output.textContent = "Token Payload:\n" + JSON.stringify(payload, null, 2) + 
+                               "\n\nUser Info:\n" + JSON.stringify(authData.user, null, 2);
+        } catch (e) {
+            output.textContent = "Error decoding token: " + e.message;
+        }
+    });
+
+    document.getElementById('debug-get-raw-data').addEventListener('click', async function() {
+        const output = document.getElementById('debug-output');
+        output.style.display = 'block';
+        output.textContent = "Fetching raw booking data...";
+        
+        try {
+            const result = await apiRequest('bookings?limit=5');
+            
+            if (result.ok) {
+                output.textContent = "Raw API Response:\n" + JSON.stringify(result.data, null, 2);
+            } else {
+                output.textContent = "API Error: " + (result.data?.error || "Unknown error");
+            }
+        } catch (e) {
+            output.textContent = "Request Error: " + e.message;
+        }
+    });
+
+    // Add this function to log API requests/responses for debugging
+    const originalFetch = window.fetch;
+    window.fetch = async function(url, options) {
+        console.log(`Fetch request to ${url}`, options);
+        const start = performance.now();
+        const response = await originalFetch(url, options);
+        const duration = performance.now() - start;
+        console.log(`Fetch response from ${url} (${duration.toFixed(0)}ms)`, response);
+        
+        // Clone the response so we can read its content for logging
+        // but still return a usable response to the caller
+        const clone = response.clone();
+        
+        try {
+            const text = await clone.text();
+            console.log(`Response body from ${url}:`, text);
+        } catch (e) {
+            console.log(`Couldn't read response body from ${url}:`, e);
+        }
+        
+        return response;
+    };
+    </script>
 </body>
 </html>
