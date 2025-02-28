@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking System API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { color: #333; }
+        .card { background: #f5f5f5; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        input, button, select { padding: 8px; margin: 5px 0; }
+        button { background: #4CAF50; color: white; border: none; cursor: pointer; }
+        pre { background: #333; color: #fff; padding: 10px; border-radius: 5px; overflow: auto; }
+        .slot { border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .auth-required { color: #d9534f; font-style: italic; }
+        .slot-list { max-height: 300px; overflow-y: auto; margin-top: 15px; }
+        .time-slot { display: flex; align-items: center; margin-bottom: 5px; }
+        .time-slot button { margin-left: 10px; }
+        .empty-message { color: #999; font-style: italic; }
+        .date-group { margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+        .date-header { font-weight: bold; color: #333; margin-bottom: 5px; }
+        .hidden { display: none; }
+        .booking-item { 
+            background: #fff; 
+            border: 1px solid #ddd; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .booking-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 10px;
+        }
+        .booking-time { 
+            font-weight: bold; 
+        }
+        .booking-status { 
+            padding: 3px 8px; 
+            border-radius: 3px; 
+            font-size: 0.8em;
+            text-transform: uppercase;
+        }
+        .status-confirmed { 
+            background-color: #d4edda; 
+            color: #155724; 
+        }
+        .status-cancelled { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+        }
+        .booking-customer { 
+            margin-bottom: 10px; 
+        }
+        .booking-actions { 
+            margin-top: 10px; 
+            text-align: right; 
+        }
+        .booking-detail { 
+            background: #fff; 
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .detail-section { 
+            margin-bottom: 15px; 
+        }
+        .detail-label { 
+            font-weight: bold; 
+            margin-right: 5px; 
+        }
+        .notes { 
+            margin-top: 10px; 
+            padding: 10px; 
+            background: #f9f9f9; 
+            border-left: 3px solid #ddd; 
+        }
+        #booking-details { 
+            margin-top: 20px; 
+            padding: 15px; 
+            background: #f9f9f9; 
+            border: 1px dashed #ddd; 
+        }
+        #cancel-booking-btn { 
+            background: #dc3545; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Booking System API Test</h1>
+    
+    <div class="card">
+        <h2>API Status</h2>
+        <button onclick="checkStatus()">Check API Status</button>
+        <pre id="status-result"></pre>
+    </div>
+    
+    <div class="card">
+        <h2>Register User</h2>
+        <input type="text" id="reg-username" placeholder="Username">
+        <input type="email" id="reg-email" placeholder="Email">
+        <input type="password" id="reg-password" placeholder="Password">
+        <button onclick="register()">Register</button>
+        <pre id="reg-result"></pre>
+    </div>
+    
+    <div class="card">
+        <h2>Login</h2>
+        <input type="text" id="login-username" placeholder="Username">
+        <input type="password" id="login-password" placeholder="Password">
+        <button onclick="login()">Login</button>
+        <pre id="login-result"></pre>
+    </div>
+    
+    <div class="card">
+        <h2>Availability Management</h2>
+        <p class="auth-required" id="availability-auth-notice">You need to login first to manage availability.</p>
+        
+        <div id="availability-controls" class="hidden">
+            <h3>Current Availability</h3>
+            <button onclick="getAvailability()">Show Current Availability</button>
+            <div id="current-availability" class="slot-list">
+                <p class="empty-message">No availability slots loaded. Click "Show Current Availability" to load slots.</p>
+            </div>
+            
+            <h3>Add New Availability Slots</h3>
+            <div>
+                <label>Date:</label>
+                <input type="date" id="slot-date">
+            </div>
+            
+            <div>
+                <label>Start Time:</label>
+                <input type="time" id="slot-start-time" value="09:00">
+            </div>
+            
+            <div>
+                <label>End Time:</label>
+                <input type="time" id="slot-end-time" value="17:00">
+            </div>
+            
+            <div>
+                <label>Slot Duration (minutes):</label>
+                <select id="slot-duration">
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="60" selected>60 minutes</option>
+                    <option value="90">90 minutes</option>
+                    <option value="120">2 hours</option>
+                </select>
+            </div>
+            
+            <button onclick="generateSlots()">Generate Slots</button>
+            
+            <div>
+                <h4>Generated Slots:</h4>
+                <div id="generated-slots" class="slot-list">
+                    <p class="empty-message">No slots generated yet. Click "Generate Slots" to create slots.</p>
+                </div>
+                
+                <button onclick="addSlots()" id="add-slots-button" class="hidden">Add These Slots</button>
+            </div>
+            
+            <pre id="availability-result"></pre>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>Booking Management</h2>
+        <p class="auth-required" id="bookings-auth-notice">You need to login first to manage bookings.</p>
+        
+        <div id="bookings-controls" class="hidden">
+            <h3>View Bookings</h3>
+            <div>
+                <label>Date Range:</label>
+                <select id="booking-date-range">
+                    <option value="today">Today</option>
+                    <option value="upcoming" selected>Upcoming</option>
+                    <option value="past">Past</option>
+                    <option value="all">All</option>
+                </select>
+                
+                <label>Status:</label>
+                <select id="booking-status">
+                    <option value="all" selected>All</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                
+                <button onclick="getBookings()">Show Bookings</button>
+            </div>
+            
+            <div id="bookings-list" class="slot-list">
+                <p class="empty-message">No bookings loaded. Click "Show Bookings" to load bookings.</p>
+            </div>
+            
+            <div id="booking-details" class="hidden">
+                <h3>Booking Details</h3>
+                <div id="booking-detail-content" class="booking-detail"></div>
+                <button onclick="cancelBooking()" id="cancel-booking-btn">Cancel Booking</button>
+                <button onclick="closeBookingDetails()">Close</button>
+            </div>
+            
+            <pre id="bookings-result"></pre>
+        </div>
+    </div>
+    
+    <script>
+        // API Base URL - Change this to match your API
+        const API_URL = 'http://localhost:8000';
+        
+        // Store authentication data
+        let authData = {
+            token: null,
+            user: null
+        };
+        
+        // Store generated slots
+        let generatedSlots = [];
+        
+        // Current active booking for actions
+        let currentBookingId = null;
+        
+        // Helper function to make API requests
+        async function apiRequest(endpoint, method = 'GET', data = null) {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+            
+            // Add authentication if token is available
+            if (authData.token) {
+                options.headers['Authorization'] = `Bearer ${authData.token}`;
+            }
+            
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/${endpoint}`, options);
+                
+                // Try to parse JSON response
+                let result;
+                const responseText = await response.text();
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error('Failed to parse JSON response:', responseText);
+                    result = { error: 'Invalid JSON response', raw: responseText };
+                }
+                
+                return {
+                    status: response.status,
+                    ok: response.ok,
+                    data: result
+                };
+            } catch (error) {
+                console.error('API Error:', error);
+                return {
+                    status: 500,
+                    ok: false,
+                    data: { error: error.message }
+                };
+            }
+        }
+        
+        // Set today's date as default for date inputs
+        function setDefaultDates() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('slot-date').value = today;
+        }
+        
+        // Initialize page
+        function init() {
+            setDefaultDates();
+            updateAuthUI();
+        }
+        
+        // Update UI based on authentication status
+        function updateAuthUI() {
+            const isAuthenticated = !!authData.token;
+            document.getElementById('availability-auth-notice').style.display = isAuthenticated ? 'none' : 'block';
+            document.getElementById('availability-controls').classList.toggle('hidden', !isAuthenticated);
+            
+            // Update for bookings section
+            document.getElementById('bookings-auth-notice').style.display = isAuthenticated ? 'none' : 'block';
+            document.getElementById('bookings-controls').classList.toggle('hidden', !isAuthenticated);
+        }
+        
+        // Check API status
+        async function checkStatus() {
+            const result = await apiRequest('ping');
+            document.getElementById('status-result').textContent = JSON.stringify(result.data, null, 2);
+        }
+        
+        // Register user
+        async function register() {
+            const username = document.getElementById('reg-username').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            
+            if (!username || !email || !password) {
+                document.getElementById('reg-result').textContent = 'Please fill all fields';
+                return;
+            }
+            
+            const result = await apiRequest('auth/register', 'POST', {
+                username,
+                email,
+                password
+            });
+            
+            document.getElementById('reg-result').textContent = JSON.stringify(result.data, null, 2);
+            
+            // Auto-fill login if registration was successful
+            if (result.ok) {
+                document.getElementById('login-username').value = username;
+                document.getElementById('login-password').value = password;
+            }
+        }
+        
+        // Login
+        async function login() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            
+            if (!username || !password) {
+                document.getElementById('login-result').textContent = 'Username and password are required';
+                return;
+            }
+            
+            const result = await apiRequest('auth/login', 'POST', { username, password });
+            
+            if (result.ok) {
+                // Store token and user data
+                authData.token = result.data.token;
+                authData.user = result.data.user;
+                
+                // Log the token for debugging
+                console.log("Token received:", authData.token.substring(0, 20) + "...");
+                
+                // Update UI
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('logout-section').classList.remove('hidden');
+                document.getElementById('user-info').textContent = `Logged in as ${authData.user.username}`;
+                
+                // Update other parts of UI that require authentication
+                updateAuthUI();
+            } else {
+                document.getElementById('login-result').textContent = JSON.stringify(result.data, null, 2);
+            }
+        }
+        
+        // Generate time slots for the UI
+        function generateSlots() {
+            if (!authData.token) {
+                document.getElementById('availability-result').textContent = 'You need to login first';
+                return;
+            }
+            
+            const date = document.getElementById('slot-date').value;
+            const startTime = document.getElementById('slot-start-time').value;
+            const endTime = document.getElementById('slot-end-time').value;
+            const duration = parseInt(document.getElementById('slot-duration').value);
+            
+            if (!date || !startTime || !endTime) {
+                document.getElementById('availability-result').textContent = 'Please fill all fields';
+                return;
+            }
+            
+            // Convert to Date objects
+            const startDateTime = new Date(`${date}T${startTime}`);
+            const endDateTime = new Date(`${date}T${endTime}`);
+            
+            // Validate time range
+            if (startDateTime >= endDateTime) {
+                document.getElementById('availability-result').textContent = 'End time must be after start time';
+                return;
+            }
+            
+            // Clear previous slots
+            generatedSlots = [];
+            const slotsDiv = document.getElementById('generated-slots');
+            slotsDiv.innerHTML = '';
+            
+            // Generate time slots based on duration
+            let currentTime = new Date(startDateTime);
+            while (currentTime.getTime() + (duration * 60000) <= endDateTime.getTime()) {
+                const slotStartTime = new Date(currentTime);
+                const slotEndTime = new Date(currentTime.getTime() + (duration * 60000));
+                
+                // Format times for display
+                const startFormatted = slotStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const endFormatted = slotEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                // Create slot object
+                const slot = {
+                    date: date,
+                    start_time: slotStartTime.toISOString(),
+                    end_time: slotEndTime.toISOString(),
+                    is_available: true
+                };
+                
+                // Add to slots array
+                generatedSlots.push(slot);
+                
+                // Create UI element
+                const slotDiv = document.createElement('div');
+                slotDiv.className = 'time-slot';
+                slotDiv.innerHTML = `
+                    <input type="checkbox" checked>
+                    <span>${startFormatted} - ${endFormatted}</span>
+                `;
+                slotsDiv.appendChild(slotDiv);
+                
+                // Move to next slot
+                currentTime = new Date(slotEndTime);
+            }
+            
+            // Show the add slots button if we have slots
+            document.getElementById('add-slots-button').classList.toggle('hidden', generatedSlots.length === 0);
+            
+            document.getElementById('availability-result').textContent = 
+                `Generated ${generatedSlots.length} slots for ${date}`;
+        }
+        
+        // Add availability slots
+        async function addSlots() {
+            if (!authData.token || !authData.user) {
+                document.getElementById('availability-result').textContent = 'You need to login first';
+                return;
+            }
+            
+            if (generatedSlots.length === 0) {
+                document.getElementById('availability-result').textContent = 'Generate slots first';
+                return;
+            }
+            
+            // Filter only checked slots
+            const checkboxes = document.querySelectorAll('#generated-slots input[type="checkbox"]');
+            const selectedSlots = [];
+            
+            checkboxes.forEach((checkbox, index) => {
+                if (checkbox.checked) {
+                    selectedSlots.push(generatedSlots[index]);
+                }
+            });
+            
+            if (selectedSlots.length === 0) {
+                document.getElementById('availability-result').textContent = 'No slots selected';
+                return;
+            }
+            
+            // Send to API
+            const result = await apiRequest('availability/set', 'POST', {
+                slots: selectedSlots
+            });
+            
+            document.getElementById('availability-result').textContent = 
+                JSON.stringify(result.data, null, 2);
+                
+            // Refresh the availability view if successful
+            if (result.ok) {
+                await getAvailability();
+            }
+        }
+        
+        // Get availability slots
+        async function getAvailability() {
+            if (!authData.token || !authData.user) {
+                document.getElementById('availability-result').textContent = 'You need to login first';
+                return;
+            }
+            
+            // Calculate a week's date range
+            const today = new Date();
+            const nextWeek = new Date();
+            nextWeek.setDate(today.getDate() + 7);
+            
+            const startDate = today.toISOString().split('T')[0];
+            const endDate = nextWeek.toISOString().split('T')[0];
+            
+            // Show loading message
+            document.getElementById('current-availability').innerHTML = 
+                '<p>Loading availability slots...</p>';
+            
+            const result = await apiRequest(`availability?start_date=${startDate}&end_date=${endDate}`);
+            
+            if (result.ok) {
+                displayAvailabilitySlots(result.data);
+            } else {
+                document.getElementById('availability-result').textContent = 
+                    JSON.stringify(result.data, null, 2);
+                
+                document.getElementById('current-availability').innerHTML = 
+                    '<p class="empty-message">Error loading availability slots.</p>';
+            }
+        }
+        
+        // Display availability slots
+        function displayAvailabilitySlots(data) {
+            const slotsDiv = document.getElementById('current-availability');
+            slotsDiv.innerHTML = '';
+            
+            // Check if we have slots
+            if (!data.slots || data.slots.length === 0) {
+                slotsDiv.innerHTML = '<p class="empty-message">No availability slots found. Add some slots below.</p>';
+                return;
+            }
+            
+            // Group slots by date
+            const slotsByDate = {};
+            
+            data.slots.forEach(slot => {
+                // Extract date part from start_time
+                const date = new Date(slot.start_time).toISOString().split('T')[0];
+                
+                if (!slotsByDate[date]) {
+                    slotsByDate[date] = [];
+                }
+                
+                slotsByDate[date].push(slot);
+            });
+            
+            // Sort dates
+            const sortedDates = Object.keys(slotsByDate).sort();
+            
+            // Create HTML for each date group
+            sortedDates.forEach(date => {
+                const slots = slotsByDate[date];
+                
+                // Format date for display
+                const displayDate = new Date(date).toLocaleDateString(undefined, { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                
+                // Create date group
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'date-group';
+                dateDiv.innerHTML = `<div class="date-header">${displayDate}</div>`;
+                
+                // Add each slot
+                slots.forEach(slot => {
+                    const startTime = new Date(slot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const endTime = new Date(slot.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    
+                    const slotDiv = document.createElement('div');
+                    slotDiv.className = 'time-slot';
+                    slotDiv.innerHTML = `
+                        <span>${startTime} - ${endTime}</span>
+                        <button onclick="deleteSlot('${slot.id}')">Delete</button>
+                    `;
+                    dateDiv.appendChild(slotDiv);
+                });
+                
+                slotsDiv.appendChild(dateDiv);
+            });
+        }
+        
+        // Delete availability slot
+        async function deleteSlot(slotId) {
+            if (!authData.token || !authData.user) {
+                document.getElementById('availability-result').textContent = 'You need to login first';
+                return;
+            }
+            
+            const result = await apiRequest(`availability/delete/${slotId}`, 'DELETE');
+            
+            document.getElementById('availability-result').textContent = 
+                JSON.stringify(result.data, null, 2);
+                
+            // Refresh the availability view if successful
+            if (result.ok) {
+                await getAvailability();
+            }
+        }
+        
+        // Get bookings from API
+        async function getBookings() {
+            if (!authData.token || !authData.user) {
+                document.getElementById('bookings-result').textContent = 'You need to login first';
+                return;
+            }
+            
+            // Hide booking details if open
+            document.getElementById('booking-details').classList.add('hidden');
+            
+            // Get filter values
+            const dateRange = document.getElementById('booking-date-range').value;
+            const status = document.getElementById('booking-status').value;
+            
+            // Build query parameters
+            let queryParams = [];
+            
+            // Add date filtering
+            if (dateRange !== 'all') {
+                const today = new Date();
+                const todayStr = today.toISOString().split('T')[0];
+                
+                if (dateRange === 'today') {
+                    queryParams.push(`start_date=${todayStr}`);
+                    queryParams.push(`end_date=${todayStr}`);
+                } else if (dateRange === 'upcoming') {
+                    queryParams.push(`start_date=${todayStr}`);
+                } else if (dateRange === 'past') {
+                    queryParams.push(`end_date=${todayStr}`);
+                }
+            }
+            
+            // Add status filtering
+            if (status !== 'all') {
+                queryParams.push(`status=${status}`);
+            }
+            
+            // Build the URL
+            let url = 'bookings';
+            if (queryParams.length > 0) {
+                url += '?' + queryParams.join('&');
+            }
+            
+            // Make API request with auth token explicitly included
+            fetch(url, {
+                headers: {
+                    'Authorization': 'Bearer ' + authData.token,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('bookings-result').textContent = JSON.stringify(data, null, 2);
+                    document.getElementById('bookings-list').innerHTML = 
+                        '<p class="empty-message">Error loading bookings.</p>';
+                } else {
+                    displayBookings(data);
+                }
+            })
+            .catch(error => {
+                document.getElementById('bookings-result').textContent = error.message;
+                document.getElementById('bookings-list').innerHTML = 
+                    '<p class="empty-message">Error loading bookings.</p>';
+            });
+        }
+        
+        // Display bookings in the UI
+        function displayBookings(data) {
+            const bookingsDiv = document.getElementById('bookings-list');
+            bookingsDiv.innerHTML = '';
+            
+            // Check if we have bookings
+            if (!data.bookings || data.bookings.length === 0) {
+                bookingsDiv.innerHTML = '<p class="empty-message">No bookings found for the selected filters.</p>';
+                return;
+            }
+            
+            // Group bookings by date
+            const bookingsByDate = {};
+            
+            data.bookings.forEach(booking => {
+                // Extract date part from start_time
+                const date = new Date(booking.start_time).toISOString().split('T')[0];
+                
+                if (!bookingsByDate[date]) {
+                    bookingsByDate[date] = [];
+                }
+                
+                bookingsByDate[date].push(booking);
+            });
+            
+            // Sort dates
+            const sortedDates = Object.keys(bookingsByDate).sort();
+            
+            // Create HTML for each date group
+            sortedDates.forEach(date => {
+                const bookings = bookingsByDate[date];
+                
+                // Format date for display
+                const displayDate = new Date(date).toLocaleDateString(undefined, { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                
+                // Create date group
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'date-group';
+                dateDiv.innerHTML = `<div class="date-header">${displayDate}</div>`;
+                
+                // Add each booking
+                bookings.forEach(booking => {
+                    const startTime = new Date(booking.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const endTime = new Date(booking.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    
+                    const bookingDiv = document.createElement('div');
+                    bookingDiv.className = 'booking-item';
+                    bookingDiv.innerHTML = `
+                        <div class="booking-header">
+                            <div class="booking-time">${startTime} - ${endTime}</div>
+                            <div class="booking-status status-${booking.status}">${booking.status}</div>
+                        </div>
+                        <div class="booking-customer">
+                            <strong>${escapeHtml(booking.customer.name)}</strong><br>
+                            ${escapeHtml(booking.customer.email)}
+                            ${booking.customer.phone ? `<br>${escapeHtml(booking.customer.phone)}` : ''}
+                        </div>
+                        ${booking.notes ? `<div class="notes">${escapeHtml(booking.notes)}</div>` : ''}
+                        <div class="booking-actions">
+                            <button onclick="viewBookingDetails('${booking.id}')">View Details</button>
+                        </div>
+                    `;
+                    dateDiv.appendChild(bookingDiv);
+                });
+                
+                bookingsDiv.appendChild(dateDiv);
+            });
+        }
+        
+        // View booking details
+        async function viewBookingDetails(bookingId) {
+            currentBookingId = bookingId;
+            
+            const result = await apiRequest(`bookings/${bookingId}`);
+            
+            if (result.ok) {
+                const booking = result.data;
+                
+                // Show booking details
+                const detailDiv = document.getElementById('booking-detail-content');
+                
+                // Format dates
+                const startDateTime = new Date(booking.start_time);
+                const endDateTime = new Date(booking.end_time);
+                const dateFormatted = startDateTime.toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                const startTime = startDateTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                const endTime = endDateTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                
+                // Build the detail HTML
+                let detailHtml = `
+                    <div class="detail-section">
+                        <div><span class="detail-label">Date:</span> ${dateFormatted}</div>
+                        <div><span class="detail-label">Time:</span> ${startTime} - ${endTime}</div>
+                        <div><span class="detail-label">Status:</span> <span class="booking-status status-${booking.status}">${booking.status}</span></div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div><span class="detail-label">Customer:</span> ${escapeHtml(booking.customer.name)}</div>
+                        <div><span class="detail-label">Email:</span> ${escapeHtml(booking.customer.email)}</div>
+                        ${booking.customer.phone ? `<div><span class="detail-label">Phone:</span> ${escapeHtml(booking.customer.phone)}</div>` : ''}
+                    </div>
+                `;
+                
+                // Add notes if present
+                if (booking.notes) {
+                    detailHtml += `
+                        <div class="detail-section">
+                            <div class="detail-label">Notes:</div>
+                            <div class="notes">${escapeHtml(booking.notes)}</div>
+                        </div>
+                    `;
+                }
+                
+                // Add booking ID and timestamps
+                detailHtml += `
+                    <div class="detail-section">
+                        <div><span class="detail-label">Booking ID:</span> ${booking.id}</div>
+                        <div><span class="detail-label">Created:</span> ${new Date(booking.created_at).toLocaleString()}</div>
+                        ${booking.updated_at ? `<div><span class="detail-label">Last Updated:</span> ${new Date(booking.updated_at).toLocaleString()}</div>` : ''}
+                    </div>
+                `;
+                
+                detailDiv.innerHTML = detailHtml;
+                
+                // Show/hide cancel button based on status
+                document.getElementById('cancel-booking-btn').style.display = 
+                    booking.status === 'confirmed' ? 'inline-block' : 'none';
+                
+                // Show the details section
+                document.getElementById('booking-details').classList.remove('hidden');
+            } else {
+                document.getElementById('bookings-result').textContent = 
+                    JSON.stringify(result.data, null, 2);
+            }
+        }
+        
+        // Close booking details
+        function closeBookingDetails() {
+            document.getElementById('booking-details').classList.add('hidden');
+            currentBookingId = null;
+        }
+        
+        // Cancel booking
+        async function cancelBooking() {
+            if (!currentBookingId) {
+                document.getElementById('bookings-result').textContent = 'No booking selected';
+                return;
+            }
+            
+            if (!confirm('Are you sure you want to cancel this booking?')) {
+                return;
+            }
+            
+            const result = await apiRequest(`bookings/${currentBookingId}/cancel`, 'PUT');
+            
+            document.getElementById('bookings-result').textContent = 
+                JSON.stringify(result.data, null, 2);
+                
+            // If successful, refresh the bookings list and close details
+            if (result.ok) {
+                closeBookingDetails();
+                await getBookings();
+            }
+        }
+        
+        // Helper function to escape HTML
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+        
+        // Initialize page on load
+        window.onload = init;
+    </script>
+</body>
+</html>

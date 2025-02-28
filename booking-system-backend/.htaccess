@@ -1,0 +1,22 @@
+# Enable URL rewriting
+RewriteEngine On
+
+# If the requested file or directory exists, serve it directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Route all other requests to index.php
+RewriteRule ^ public/index.php [L]
+
+# Prevent direct access to sensitive files
+<FilesMatch "^(config|src)">
+    Order deny,allow
+    Deny from all
+</FilesMatch>
+
+# Prevent viewing of .htaccess file
+<Files .htaccess>
+    Order deny,allow
+    Deny from all
+</Files>

@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Provider Booking Management</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            line-height: 1.6;
+        }
+        h1, h2, h3 { color: #333; margin-top: 20px; }
+        .card { 
+            background: #f9f9f9; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        input, button, select { 
+            padding: 8px 12px; 
+            margin: 5px 0; 
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        label { margin-right: 10px; }
+        button { 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: bold;
+        }
+        button:hover { background: #45a049; }
+        button.danger { background: #f44336; }
+        button.danger:hover { background: #d32f2f; }
+        .hidden { display: none; }
+        pre { 
+            background: #f1f1f1;
+            padding: 10px;
+            border-radius: 4px;
+            overflow: auto;
+            font-family: monospace;
+        }
+        .auth-required { 
+            color: #d9534f; 
+            font-style: italic; 
+            margin-bottom: 10px;
+        }
+        .booking-list { 
+            max-height: 600px; 
+            overflow-y: auto; 
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+        .booking-item { 
+            background: #fff; 
+            border-bottom: 1px solid #eee; 
+            padding: 15px; 
+            margin: 0;
+        }
+        .booking-item:last-child {
+            border-bottom: none;
+        }
+        .booking-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 10px;
+        }
+        .booking-time { 
+            font-weight: bold; 
+        }
+        .booking-status { 
+            padding: 3px 8px; 
+            border-radius: 3px; 
+            font-size: 0.8em;
+            text-transform: uppercase;
+        }
+        .status-confirmed { 
+            background-color: #dff0d8; 
+            color: #3c763d; 
+        }
+        .status-completed {
+            background-color: #d9edf7;
+            color: #31708f;
+        }
+        .status-cancelled { 
+            background-color: #f2dede; 
+            color: #a94442; 
+        }
+        .date-group { 
+            margin-bottom: 10px; 
+        }
+        .date-header { 
+            background: #eee; 
+            padding: 8px 15px; 
+            font-weight: bold; 
+            border-radius: 4px 4px 0 0;
+        }
+        .booking-detail { 
+            background: #fff; 
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .detail-section { 
+            margin-bottom: 15px; 
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .detail-section:last-child {
+            border-bottom: none;
+        }
+        .detail-label { 
+            font-weight: bold; 
+            margin-right: 5px; 
+        }
+        .notes { 
+            margin-top: 10px; 
+            padding: 10px; 
+            background: #f9f9f9; 
+            border-left: 3px solid #ddd; 
+        }
+        #api-response {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #333;
+            color: #fff;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Provider Booking Management</h1>
+    
+    <div class="card" id="login-form">
+        <h2>Authentication</h2>
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" id="username" placeholder="Username">
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" placeholder="Password">
+        </div>
+        <button onclick="login()">Login</button>
+        <p id="login-message"></p>
+    </div>
+    
+    <div class="card hidden" id="logged-in-info">
+        <div class="form-group">
+            <strong>Logged in as: </strong><span id="user-display"></span>
+            <button onclick="logout()" style="margin-left: 20px;">Logout</button>
+        </div>
+    </div>
+    
+    <div class="card hidden" id="booking-management">
+        <h2>View Bookings</h2>
+        
+        <div class="form-group">
+            <button onclick="loadUpcomingBookings()" class="tab-btn">Upcoming Bookings</button>
+            <button onclick="loadPastBookings()" class="tab-btn">Past Bookings</button>
+            <button onclick="loadAllBookings()" class="tab-btn">All Bookings</button>
+        </div>
+        
+        <div id="all-bookings-filter" class="form-group hidden">
+            <h3>Filter Options</h3>
+            <div class="form-group">
+                <label for="start-date">Start Date:</label>
+                <input type="date" id="start-date">
+                
+                <label for="end-date">End Date:</label>
+                <input type="date" id="end-date">
+            </div>
+            
+            <div class="form-group">
+                <label for="status-filter">Status:</label>
+                <select id="status-filter">
+                    <option value="">All</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                
+                <button onclick="applyFilters()">Apply Filters</button>
+                <button onclick="clearFilters()">Clear Filters</button>
+            </div>
+        </div>
+        
+        <div id="booking-tabs">
+            <!-- Upcoming Bookings Tab -->
+            <div id="upcoming-bookings-container">
+                <h3>Upcoming Bookings</h3>
+                <div id="upcoming-bookings-table" class="booking-list">
+                    <p class="loading">Loading bookings...</p>
+                </div>
+            </div>
+            
+            <!-- Past Bookings Tab -->
+            <div id="past-bookings-container" class="hidden">
+                <h3>Past Bookings</h3>
+                <div id="past-bookings-table" class="booking-list">
+                    <p class="loading">Loading bookings...</p>
+                </div>
+            </div>
+            
+            <!-- All Bookings Tab -->
+            <div id="all-bookings-container" class="hidden">
+                <h3>All Bookings</h3>
+                <div id="all-bookings-table" class="booking-list">
+                    <p class="loading">Loading bookings...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Booking Details Popup -->
+        <div id="booking-details-card" class="booking-detail hidden">
+            <h3>Booking Details</h3>
+            <div id="booking-details-content"></div>
+            <div class="form-group" style="margin-top: 15px;">
+                <button onclick="closeBookingDetails()">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="api-response" class="hidden"></div>
+    
+    <script>
+        // Store authentication data
+        let authData = {
+            token: null,
+            user: null
+        };
+        
+        // Current booking being viewed
+        let currentBookingId = null;
+        
+        // Helper function to make API requests
+        async function apiRequest(endpoint, method = 'GET', data = null) {
+            try {
+                // Setup request options
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                };
+                
+                // Add auth token if available
+                if (authData.token) {
+                    options.headers['Authorization'] = `Bearer ${authData.token}`;
+                    console.log(`Adding token to ${endpoint} request: ${authData.token.substring(0, 20)}...`);
+                }
+                
+                // Add request body for POST/PUT
+                if (data && (method === 'POST' || method === 'PUT')) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                // Make the request
+                console.log(`Making ${method} request to: ${endpoint}`);
+                const response = await fetch(endpoint, options);
+                
+                // Try to parse JSON response
+                let responseData;
+                const responseText = await response.text();
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (e) {
+                    console.error('Failed to parse JSON response:', responseText);
+                    responseData = { error: 'Invalid JSON response', raw: responseText };
+                }
+                
+                // Update the API response display
+                const apiResponseElement = document.getElementById('apiResponse');
+                if (apiResponseElement) {
+                    apiResponseElement.textContent = JSON.stringify(responseData, null, 2);
+                }
+                
+                return {
+                    ok: response.ok,
+                    status: response.status,
+                    data: responseData
+                };
+            } catch (error) {
+                console.error('API request failed:', error);
+                return {
+                    ok: false,
+                    status: 0,
+                    data: { error: error.message }
+                };
+            }
+        }
+        
+        // Helper functions for UI
+        function showMessage(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = message;
+                element.className = type;
+            }
+        }
+        
+        function clearMessage(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = '';
+                element.className = '';
+            }
+        }
+        
+        function toggleElement(elementId, show) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                if (show) {
+                    element.classList.remove('hidden');
+                } else {
+                    element.classList.add('hidden');
+                }
+            }
+        }
+        
+        // Set default dates for the filter
+        function setDefaultDates() {
+            const today = new Date();
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setMonth(today.getMonth() - 1);
+            
+            document.getElementById('start-date').value = oneMonthAgo.toISOString().split('T')[0];
+            document.getElementById('end-date').value = today.toISOString().split('T')[0];
+        }
+        
+        // Authentication functions
+        async function login() {
+            clearMessage('login-message');
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                showMessage('login-message', 'Username and password are required', 'error');
+                return;
+            }
+            
+            const result = await apiRequest('auth/login', 'POST', { username, password });
+            
+            if (result.ok && result.data.token) {
+                authData.token = result.data.token;
+                authData.user = result.data.user;
+                
+                console.log("Token received:", authData.token.substring(0, 20) + "...");
+                
+                // Store in localStorage for persistence
+                storeAuthData();
+                
+                // Update UI
+                document.getElementById('user-display').textContent = authData.user.username;
+                toggleElement('login-form', false);
+                toggleElement('logged-in-info', true);
+                toggleElement('booking-management', true);
+                
+                // Load initial booking data
+                loadUpcomingBookings();
+                
+                // Initialize date inputs
+                setDefaultDates();
+                
+                showMessage('login-message', 'Login successful!', 'success');
+            } else {
+                showMessage('login-message', result.data.error || 'Login failed', 'error');
+            }
+        }
+        
+        function logout() {
+            authData.token = null;
+            authData.user = null;
+            
+            // Clear from localStorage
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('authUser');
+            
+            // Update UI
+            toggleElement('login-form', true);
+            toggleElement('logged-in-info', false);
+            toggleElement('booking-management', false);
+            toggleElement('booking-details-card', false);
+            
+            showMessage('login-message', 'You have been logged out', 'info');
+        }
+        
+        function storeAuthData() {
+            if (authData.token && authData.user) {
+                localStorage.setItem('authToken', authData.token);
+                localStorage.setItem('authUser', JSON.stringify(authData.user));
+            } else {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('authUser');
+            }
+        }
+        
+        function checkStoredAuth() {
+            const storedToken = localStorage.getItem('authToken');
+            const storedUser = localStorage.getItem('authUser');
+            
+            if (storedToken && storedUser) {
+                try {
+                    authData.token = storedToken;
+                    authData.user = JSON.parse(storedUser);
+                    
+                    // Update UI
+                    document.getElementById('user-display').textContent = authData.user.username;
+                    toggleElement('login-form', false);
+                    toggleElement('logged-in-info', true);
+                    toggleElement('booking-management', true);
+                    
+                    // Load initial booking data
+                    loadUpcomingBookings();
+                    
+                    // Initialize date inputs
+                    setDefaultDates();
+                } catch (error) {
+                    console.error('Error restoring session:', error);
+                    logout(); // Clear invalid session data
+                }
+            }
+        }
+        
+        // Booking management functions
+        async function loadUpcomingBookings() {
+            // Hide filter options
+            toggleElement('all-bookings-filter', false);
+            
+            // Show upcoming tab, hide others
+            toggleElement('upcoming-bookings-container', true);
+            toggleElement('past-bookings-container', false);
+            toggleElement('all-bookings-container', false);
+            
+            // Get today's date
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Make API request
+            const result = await apiRequest(`bookings?start_date=${today}&status=confirmed`);
+            
+            if (result.ok) {
+                // Check the structure of the response data
+                if (result.data && result.data.items) {
+                    // The new structure returns { items: [...bookings], pagination: {...} }
+                    displayBookings('upcoming-bookings-table', result.data.items);
+                } else if (Array.isArray(result.data)) {
+                    // Handle old-style response that returns bookings directly as an array
+                    displayBookings('upcoming-bookings-table', result.data);
+                } else if (result.data && result.data.bookings) {
+                    // Handle another possible structure { bookings: [...] }
+                    displayBookings('upcoming-bookings-table', result.data.bookings);
+                } else {
+                    // No valid data structure found
+                    document.getElementById('upcoming-bookings-table').innerHTML = 
+                        '<p>No bookings found or unexpected response format.</p>';
+                }
+            } else {
+                document.getElementById('upcoming-bookings-table').innerHTML = 
+                    `<p>Error loading bookings: ${result.data.error || 'Unknown error'}</p>`;
+            }
+        }
+
+        async function loadPastBookings() {
+            // Hide filter options
+            toggleElement('all-bookings-filter', false);
+            
+            // Show past tab, hide others
+            toggleElement('upcoming-bookings-container', false);
+            toggleElement('past-bookings-container', true);
+            toggleElement('all-bookings-container', false);
+            
+            // Get today's date
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Make API request
+            const result = await apiRequest(`bookings?end_date=${today}`);
+            
+            if (result.ok) {
+                // Check the structure of the response data
+                if (result.data && result.data.items) {
+                    displayBookings('past-bookings-table', result.data.items);
+                } else if (Array.isArray(result.data)) {
+                    displayBookings('past-bookings-table', result.data);
+                } else if (result.data && result.data.bookings) {
+                    displayBookings('past-bookings-table', result.data.bookings);
+                } else {
+                    document.getElementById('past-bookings-table').innerHTML = 
+                        '<p>No bookings found or unexpected response format.</p>';
+                }
+            } else {
+                document.getElementById('past-bookings-table').innerHTML = 
+                    `<p>Error loading bookings: ${result.data.error || 'Unknown error'}</p>`;
+            }
+        }
+
+        async function loadAllBookings() {
+            // Show filter options
+            toggleElement('all-bookings-filter', true);
+            
+            // Show all tab, hide others
+            toggleElement('upcoming-bookings-container', false);
+            toggleElement('past-bookings-container', false);
+            toggleElement('all-bookings-container', true);
+            
+            // Get filter values
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const status = document.getElementById('status-filter').value;
+            
+            // Build query
+            let query = [];
+            if (startDate) query.push(`start_date=${startDate}`);
+            if (endDate) query.push(`end_date=${endDate}`);
+            if (status) query.push(`status=${status}`);
+            
+            const queryString = query.length > 0 ? '?' + query.join('&') : '';
+            
+            // Make API request
+            const result = await apiRequest(`bookings${queryString}`);
+            
+            if (result.ok) {
+                // Check the structure of the response data
+                if (result.data && result.data.items) {
+                    displayBookings('all-bookings-table', result.data.items);
+                } else if (Array.isArray(result.data)) {
+                    displayBookings('all-bookings-table', result.data);
+                } else if (result.data && result.data.bookings) {
+                    displayBookings('all-bookings-table', result.data.bookings);
+                } else {
+                    document.getElementById('all-bookings-table').innerHTML = 
+                        '<p>No bookings found or unexpected response format.</p>';
+                }
+            } else {
+                document.getElementById('all-bookings-table').innerHTML = 
+                    `<p>Error loading bookings: ${result.data.error || 'Unknown error'}</p>`;
+            }
+        }
+
+        function applyFilters() {
+            loadAllBookings();
+        }
+        
+        function clearFilters() {
+            document.getElementById('status-filter').value = '';
+            setDefaultDates();
+            loadAllBookings();
+        }
+        
+        function displayBookings(containerId, bookings) {
+            const container = document.getElementById(containerId);
+            
+            // Ensure bookings is iterable
+            if (!bookings || !Array.isArray(bookings) || bookings.length === 0) {
+                container.innerHTML = '<p>No bookings found.</p>';
+                return;
+            }
+            
+            // Group bookings by date
+            const bookingsByDate = {};
+            
+            bookings.forEach(booking => {
+                // Extract date from booking, handling both date and start_time formats
+                let bookingDate;
+                if (booking.start_time) {
+                    bookingDate = new Date(booking.start_time).toISOString().split('T')[0];
+                } else if (booking.date) {
+                    bookingDate = new Date(booking.date).toISOString().split('T')[0];
+                } else {
+                    // If neither field exists, use today's date as fallback
+                    bookingDate = new Date().toISOString().split('T')[0];
+                }
+                
+                if (!bookingsByDate[bookingDate]) {
+                    bookingsByDate[bookingDate] = [];
+                }
+                
+                bookingsByDate[bookingDate].push(booking);
+            });
+            
+            // Sort dates
+            const sortedDates = Object.keys(bookingsByDate).sort();
+            
+            // Build HTML
+            let html = '';
+            
+            sortedDates.forEach(date => {
+                // Format date for display
+                const displayDate = new Date(date).toLocaleDateString(undefined, { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                
+                html += `<div class="date-group">
+                            <div class="date-header">${displayDate}</div>`;
+                
+                bookingsByDate[date].forEach(booking => {
+                    // Format times
+                    const startTime = new Date(booking.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const endTime = new Date(booking.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    
+                    html += `
+                        <div class="booking-item">
+                            <div class="booking-header">
+                                <div class="booking-time">${startTime} - ${endTime}</div>
+                                <div class="booking-status status-${booking.status}">${booking.status}</div>
+                            </div>
+                            <div>
+                                <strong>${escapeHtml(booking.customer_name || booking.customer?.name || 'N/A')}</strong>
+                                ${booking.service ? `<div>Service: ${escapeHtml(booking.service)}</div>` : ''}
+                            </div>
+                            <div style="margin-top: 10px;">
+                                <button onclick="viewBookingDetails('${booking.id}')">View Details</button>
+                            </div>
+                        </div>`;
+                });
+                
+                html += `</div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        async function viewBookingDetails(id) {
+            currentBookingId = id;
+            
+            // Make API request to get booking details
+            const result = await apiRequest(`booking/${id}`);
+            
+            if (result.ok) {
+                const booking = result.data;
+                
+                // Format dates and times
+                const startDateTime = new Date(booking.start_time);
+                const endDateTime = new Date(booking.end_time);
+                
+                const dateFormatted = startDateTime.toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                
+                const startTimeFormatted = startDateTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                const endTimeFormatted = endDateTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                const createdAtFormatted = new Date(booking.created_at).toLocaleString();
+                
+                // Build HTML for booking details
+                let html = `
+                    <div class="detail-section">
+                        <div><span class="detail-label">Date:</span> ${dateFormatted}</div>
+                        <div><span class="detail-label">Time:</span> ${startTimeFormatted} - ${endTimeFormatted}</div>
+                        <div>
+                            <span class="detail-label">Status:</span> 
+                            <span class="booking-status status-${booking.status}">${booking.status}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div><span class="detail-label">Customer:</span> ${escapeHtml(booking.customer_name || booking.customer?.name || 'N/A')}</div>
+                        <div><span class="detail-label">Email:</span> ${escapeHtml(booking.customer_email || booking.customer?.email || 'N/A')}</div>
+                        <div><span class="detail-label">Phone:</span> ${escapeHtml(booking.customer_phone || booking.customer?.phone || 'N/A')}</div>
+                    </div>
+                `;
+                
+                // Add service details if available
+                if (booking.service) {
+                    html += `
+                        <div class="detail-section">
+                            <div><span class="detail-label">Service:</span> ${escapeHtml(booking.service)}</div>
+                            ${booking.price ? `<div><span class="detail-label">Price:</span> $${booking.price.toFixed(2)}</div>` : ''}
+                        </div>
+                    `;
+                }
+                
+                // Add notes if available
+                if (booking.notes) {
+                    html += `
+                        <div class="detail-section">
+                            <div class="detail-label">Notes:</div>
+                            <div class="notes">${escapeHtml(booking.notes)}</div>
+                        </div>
+                    `;
+                }
+                
+                // Add metadata
+                html += `
+                    <div class="detail-section">
+                        <div><span class="detail-label">Booking ID:</span> ${booking.id}</div>
+                        <div><span class="detail-label">Created:</span> ${createdAtFormatted}</div>
+                        ${booking.updated_at ? `<div><span class="detail-label">Last Updated:</span> ${new Date(booking.updated_at).toLocaleString()}</div>` : ''}
+                    </div>
+                `;
+                
+                // Update the details container
+                document.getElementById('booking-details-content').innerHTML = html;
+                
+                // Show the details card
+                toggleElement('booking-details-card', true);
+            } else {
+                alert('Error loading booking details: ' + (result.data.error || 'Unknown error'));
+            }
+        }
+        
+        function closeBookingDetails() {
+            toggleElement('booking-details-card', false);
+            currentBookingId = null;
+        }
+        
+        // Helper function to escape HTML to prevent XSS
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return unsafe
+                .toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+        
+        // Run on page load
+        window.onload = function() {
+            checkStoredAuth();
+        };
+    </script>
+</body>
+</html>

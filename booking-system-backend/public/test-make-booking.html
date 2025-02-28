@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book an Appointment</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            line-height: 1.6;
+            color: #333;
+        }
+        h1, h2, h3 { 
+            color: #2c3e50; 
+            margin-top: 0;
+        }
+        .card { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-bottom: 25px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        input, button, select, textarea { 
+            padding: 10px; 
+            margin: 5px 0; 
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        textarea {
+            resize: vertical;
+        }
+        button { 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            transition: background 0.3s;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        pre { 
+            background: #333; 
+            color: #fff; 
+            padding: 10px; 
+            border-radius: 5px; 
+            overflow: auto; 
+        }
+        .slot-list { 
+            max-height: 400px; 
+            overflow-y: auto; 
+            margin-top: 15px; 
+            padding: 5px;
+        }
+        .date-group { 
+            margin-bottom: 20px; 
+            border-bottom: 1px solid #ddd; 
+            padding-bottom: 15px; 
+        }
+        .date-header { 
+            font-weight: bold; 
+            color: #2c3e50; 
+            margin-bottom: 8px; 
+            font-size: 1.1em;
+            padding-left: 5px;
+        }
+        .time-slot { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 12px;
+            margin: 8px 0;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #eee;
+            transition: all 0.2s;
+        }
+        .time-slot:hover {
+            background: #f0f7ff;
+            border-color: #b3d7ff;
+            transform: translateY(-2px);
+        }
+        .time-slot button {
+            width: auto;
+            padding: 8px 15px;
+        }
+        .empty-message { 
+            color: #999; 
+            font-style: italic; 
+            text-align: center;
+            padding: 30px 20px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+        .booking-form {
+            display: none;
+            background: #fff;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 4px solid #28a745;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 4px solid #dc3545;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .loading:after {
+            content: "...";
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: "."; }
+            40% { content: ".."; }
+            60% { content: "..."; }
+            80%, 100% { content: ""; }
+        }
+        .section-title {
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        .field-with-icon {
+            position: relative;
+        }
+        .field-with-icon input {
+            padding-right: 40px;
+        }
+        .field-with-icon button {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 40px;
+            height: 100%;
+            border-radius: 0 4px 4px 0;
+            padding: 0;
+        }
+        #selected-slot-info {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3498db;
+        }
+    </style>
+</head>
+<body>
+    <h1>Book an Appointment</h1>
+    
+    <div class="card">
+        <h2 class="section-title">Find Available Slots</h2>
+        
+        <div class="form-group">
+            <label for="provider-username">Provider Username:</label>
+            <div class="field-with-icon">
+                <input type="text" id="provider-username" placeholder="Enter provider username">
+                <button onclick="findAvailableSlots()" title="Search">🔍</button>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="start-date">Start Date:</label>
+            <input type="date" id="start-date">
+        </div>
+        
+        <div class="form-group">
+            <label for="end-date">End Date:</label>
+            <input type="date" id="end-date">
+        </div>
+        
+        <button onclick="findAvailableSlots()">Find Available Slots</button>
+        
+        <div id="available-slots" class="slot-list">
+            <p class="empty-message">Enter provider username and date range to see available slots</p>
+        </div>
+    </div>
+    
+    <div class="card" id="booking-form-container" style="display: none;">
+        <h2 class="section-title">Complete Your Booking</h2>
+        <div id="selected-slot-info"></div>
+        
+        <div class="booking-form" id="booking-form">
+            <div class="form-group">
+                <label for="name">Your Name:</label>
+                <input type="text" id="name" placeholder="Enter your full name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Your Email:</label>
+                <input type="email" id="email" placeholder="Enter your email address" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="phone">Phone Number (optional):</label>
+                <input type="tel" id="phone" placeholder="Enter your phone number">
+            </div>
+            
+            <div class="form-group">
+                <label for="notes">Notes (optional):</label>
+                <textarea id="notes" rows="3" placeholder="Any special requests or information you want to provide"></textarea>
+            </div>
+            
+            <button onclick="bookAppointment()" id="book-button">Book Now</button>
+        </div>
+        
+        <div id="booking-result"></div>
+    </div>
+    
+    <script>
+        // API Base URL - Change this to match your API
+        const API_URL = 'http://localhost:8000';
+        
+        // Selected slot info
+        let selectedSlot = null;
+        let selectedProvider = null;
+        
+        // Set default dates
+        function setDefaultDates() {
+            const today = new Date();
+            const nextWeek = new Date();
+            nextWeek.setDate(today.getDate() + 7);
+            
+            document.getElementById('start-date').value = today.toISOString().split('T')[0];
+            document.getElementById('end-date').value = nextWeek.toISOString().split('T')[0];
+        }
+        
+        // Initialize
+        window.addEventListener('DOMContentLoaded', function() {
+            setDefaultDates();
+            
+            // Add enter key support for provider username field
+            document.getElementById('provider-username').addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    findAvailableSlots();
+                }
+            });
+        });
+        
+        // Find available slots
+        async function findAvailableSlots() {
+            const username = document.getElementById('provider-username').value.trim();
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            
+            if (!username) {
+                alert('Please enter a provider username');
+                document.getElementById('provider-username').focus();
+                return;
+            }
+            
+            if (!startDate || !endDate) {
+                alert('Please select start and end dates');
+                return;
+            }
+            
+            // Store selected provider
+            selectedProvider = username;
+            
+            // Show loading
+            document.getElementById('available-slots').innerHTML = '<p class="loading">Loading available slots</p>';
+            
+            try {
+                const response = await fetch(`${API_URL}/public/availability?username=${encodeURIComponent(username)}&start_date=${startDate}&end_date=${endDate}`);
+                const data = await response.json();
+                
+                if (response.ok && data.slots) {
+                    displaySlots(data.slots);
+                } else {
+                    document.getElementById('available-slots').innerHTML = 
+                        `<div class="error">${data.error || 'Error loading availability'}</div>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('available-slots').innerHTML = 
+                    `<div class="error">Failed to connect to the server. Please try again.</div>`;
+            }
+        }
+        
+        // Display slots
+        function displaySlots(slots) {
+            const container = document.getElementById('available-slots');
+            
+            if (!slots || slots.length === 0) {
+                container.innerHTML = '<p class="empty-message">No available slots found for this provider and date range</p>';
+                return;
+            }
+            
+            // Group slots by date
+            const slotsByDate = {};
+            
+            slots.forEach(slot => {
+                const date = new Date(slot.start_time).toISOString().split('T')[0];
+                if (!slotsByDate[date]) {
+                    slotsByDate[date] = [];
+                }
+                slotsByDate[date].push(slot);
+            });
+            
+            // Create HTML
+            let html = '';
+            
+            Object.keys(slotsByDate).sort().forEach(date => {
+                const dateObj = new Date(date);
+                const formattedDate = dateObj.toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                
+                html += `<div class="date-group">
+                            <div class="date-header">${formattedDate}</div>`;
+                
+                slotsByDate[date].forEach(slot => {
+                    const startTime = new Date(slot.start_time).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    const endTime = new Date(slot.end_time).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    html += `<div class="time-slot">
+                                <span>${startTime} - ${endTime}</span>
+                                <button onclick='selectSlot(${JSON.stringify(slot)})'>Book This Slot</button>
+                            </div>`;
+                });
+                
+                html += `</div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // Select a slot
+        function selectSlot(slot) {
+            selectedSlot = slot;
+            
+            // Show booking form
+            document.getElementById('booking-form-container').style.display = 'block';
+            document.getElementById('booking-form').style.display = 'block';
+            document.getElementById('booking-result').innerHTML = '';
+            
+            // Enable the booking button
+            document.getElementById('book-button').disabled = false;
+            
+            // Format date and time for display
+            const date = new Date(slot.start_time).toLocaleDateString(undefined, {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            const startTime = new Date(slot.start_time).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            const endTime = new Date(slot.end_time).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            // Display selected slot info
+            document.getElementById('selected-slot-info').innerHTML = `
+                <p>
+                    <strong>Date:</strong> ${date}<br>
+                    <strong>Time:</strong> ${startTime} - ${endTime}<br>
+                    <strong>Provider:</strong> ${selectedProvider}
+                </p>
+            `;
+            
+            // Scroll to booking form
+            document.getElementById('booking-form-container').scrollIntoView({
+                behavior: 'smooth'
+            });
+        }
+        
+        // Book appointment
+        async function bookAppointment() {
+            if (!selectedSlot || !selectedProvider) {
+                alert('Please select a time slot first');
+                return;
+            }
+            
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const notes = document.getElementById('notes').value.trim();
+            
+            if (!name || !email) {
+                alert('Please enter your name and email');
+                return;
+            }
+            
+            // Validate email format
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                alert('Please enter a valid email address');
+                document.getElementById('email').focus();
+                return;
+            }
+            
+            // Disable the button to prevent double-booking
+            document.getElementById('book-button').disabled = true;
+            
+            // Show loading
+            document.getElementById('booking-result').innerHTML = '<p class="loading">Processing your booking</p>';
+            
+            try {
+                const response = await fetch(`${API_URL}/public/booking`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        slot_id: selectedSlot.id,
+                        provider_username: selectedProvider,
+                        customer: {
+                            name,
+                            email,
+                            phone
+                        },
+                        notes
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('booking-result').innerHTML = `
+                        <div class="success">
+                            <h3>Booking Successful!</h3>
+                            <p>${data.message || 'Your appointment has been booked.'}</p>
+                            ${data.booking_id ? `<p><strong>Booking Reference:</strong> ${data.booking_id}</p>` : ''}
+                            <p>We've sent a confirmation to your email. Please keep this reference for your records.</p>
+                        </div>
+                    `;
+                    
+                    // Hide the form
+                    document.getElementById('booking-form').style.display = 'none';
+                    
+                    // Clear form fields
+                    document.getElementById('name').value = '';
+                    document.getElementById('email').value = '';
+                    document.getElementById('phone').value = '';
+                    document.getElementById('notes').value = '';
+                    
+                    // Refresh available slots to remove the booked one
+                    findAvailableSlots();
+                } else {
+                    document.getElementById('booking-result').innerHTML = `
+                        <div class="error">
+                            <h3>Booking Failed</h3>
+                            <p>${data.error || 'An error occurred during booking. Please try again.'}</p>
+                        </div>
+                    `;
+                    // Re-enable booking button
+                    document.getElementById('book-button').disabled = false;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('booking-result').innerHTML = `
+                    <div class="error">
+                        <h3>Booking Failed</h3>
+                        <p>Failed to connect to the server. Please try again later.</p>
+                    </div>
+                `;
+                // Re-enable booking button
+                document.getElementById('book-button').disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
