@@ -26,44 +26,33 @@ class AuthController extends BaseController {
         $data = $this->getJsonData();
         
         // Validate required fields
-        if (!isset($data['username'], $data['email'], $data['password'])) {
-            Response::json(['error' => 'Missing required fields'], 400);
-            return;
-        }
-        
-        // Check if username already exists
-        if ($this->userModel->findByUsername($data['username'])) {
-            Response::json(['error' => 'Username already exists'], 409);
-            return;
-        }
-        
-        // Check if email already exists
-        if ($this->userModel->findByEmail($data['email'])) {
-            Response::json(['error' => 'Email already exists'], 409);
-            return;
-        }
-        
-        // Create user with hashed password
-        try {
-            $userId = $this->userModel->create([
-                'username' => $data['username'],
-                'email' => $data['email'],
-                'password' => password_hash($data['password'], PASSWORD_DEFAULT),
-                'role' => 'user' // Default role
-            ]);
-            
-            if (!$userId) {
-                Response::json(['error' => 'Failed to create user'], 500);
+        $requiredFields = ['username', 'email', 'password'];
+        foreach ($requiredFields as $field) {
+            if (empty($data[$field])) {
+                Response::json([
+                    'error' => 'Missing required field',
+                    'field' => $field
+                ], 400);
                 return;
             }
-            
+        }
+        
+        // Create the user model
+        $userModel = new \App\Models\UserModel();
+        
+        // Pass all input data (including developer_key and team_id if present)
+        $user = $userModel->register($data);
+        
+        if ($user) {
             Response::json([
                 'message' => 'User registered successfully',
-                'userId' => (string)$userId,
-                'username' => $data['username']
+                'user' => $user
             ], 201);
-        } catch (\Exception $e) {
-            Response::json(['error' => $e->getMessage()], 500);
+        } else {
+            Response::json([
+                'error' => 'Registration failed',
+                'details' => 'Username or email may already be in use'
+            ], 400);
         }
     }
     

@@ -126,6 +126,14 @@
                 <label for="confirmPassword">Confirm Password:</label>
                 <input type="password" id="confirmPassword" required>
             </div>
+            <div>
+                <label for="developerKey">Digital Samba Developer Key:</label>
+                <input type="text" id="developerKey" placeholder="Enter your Digital Samba developer key">
+            </div>
+            <div>
+                <label for="teamId">Digital Samba Team ID:</label>
+                <input type="text" id="teamId" placeholder="Enter your Digital Samba team ID">
+            </div>
             <button type="button" onclick="registerUser()">Register</button>
         </form>
         <div id="registerResult"></div>
@@ -286,11 +294,13 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
+            const developerKey = document.getElementById('developerKey').value;
+            const teamId = document.getElementById('teamId').value;
             
             // Validate inputs
             if (!username || !email || !password) {
                 document.getElementById('registerResult').innerHTML = 
-                    '<p class="error">All fields are required</p>';
+                    '<p class="error">Username, email and password are required</p>';
                 return;
             }
             
@@ -306,6 +316,15 @@
                 email,
                 password
             };
+            
+            // Add optional fields if provided
+            if (developerKey) {
+                registrationData.developer_key = developerKey;
+            }
+            
+            if (teamId) {
+                registrationData.team_id = teamId;
+            }
             
             // Make API request
             const result = await apiRequest('auth/register', 'POST', registrationData);

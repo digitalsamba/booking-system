@@ -45,6 +45,95 @@ class UserModel extends BaseModel {
     }
     
     /**
+     * Check if a username already exists
+     * 
+     * @param string $username Username to check
+     * @return bool True if username exists
+     */
+    public function usernameExists(string $username): bool {
+        try {
+            $count = $this->collection->countDocuments(['username' => $username]);
+            return $count > 0;
+        } catch (\Exception $e) {
+            error_log("Error checking if username exists: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Check if an email already exists
+     * 
+     * @param string $email Email to check
+     * @return bool True if email exists
+     */
+    public function emailExists(string $email): bool {
+        try {
+            $count = $this->collection->countDocuments(['email' => $email]);
+            return $count > 0;
+        } catch (\Exception $e) {
+            error_log("Error checking if email exists: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Register a new user
+     * 
+     * @param array $userData User data
+     * @return array|bool New user data or false if registration failed
+     */
+    public function register(array $userData): array|bool {
+        try {
+            // Validate required fields
+            if (empty($userData['username']) || empty($userData['email']) || empty($userData['password'])) {
+                return false;
+            }
+            
+            // Check if username or email already exists
+            if ($this->usernameExists($userData['username']) || $this->emailExists($userData['email'])) {
+                return false;
+            }
+            
+            // Hash password
+            $hashedPassword = password_hash($userData['password'], PASSWORD_DEFAULT);
+            
+            // Prepare user data
+            $newUser = [
+                'username' => $userData['username'],
+                'email' => $userData['email'],
+                'password' => $hashedPassword,
+                'role' => 'user',
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ];
+            
+            // Add Digital Samba credentials if provided
+            if (!empty($userData['developer_key'])) {
+                $newUser['developer_key'] = $userData['developer_key'];
+            }
+            
+            if (!empty($userData['team_id'])) {
+                $newUser['team_id'] = $userData['team_id'];
+            }
+            
+            // Insert into database
+            $result = $this->collection->insertOne($newUser);
+            
+            if ($result->getInsertedCount() > 0) {
+                // Get the inserted user
+                $newUser['id'] = (string)$result->getInsertedId();
+                unset($newUser['password']); // Remove password from returned data
+                return $newUser;
+            }
+            
+            return false;
+        } catch (\Exception $e) {
+            error_log("Error registering user: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
      * Find a user by username
      * 
      * @param string $username
