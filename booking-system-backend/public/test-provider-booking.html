@@ -236,6 +236,12 @@
             <div class="form-group" style="margin-top: 15px;">
                 <button onclick="closeBookingDetails()">Close</button>
             </div>
+            <div id="meetingLinks" class="meeting-links" style="margin-top: 10px; padding: 10px; background-color: #f0f8ff; border-radius: 5px;">
+                <h3>Meeting Links</h3>
+                <div id="providerLink"></div>
+                <div id="customerLink"></div>
+                <button id="generateLinks" class="button" style="margin-top: 10px; background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Generate Meeting Links</button>
+            </div>
         </div>
     </div>
     
@@ -641,6 +647,7 @@
             container.innerHTML = html;
         }
         
+        // Replace the viewBookingDetails function with this updated version
         async function viewBookingDetails(id) {
             currentBookingId = id;
             
@@ -717,6 +724,63 @@
                 
                 // Show the details card
                 toggleElement('booking-details-card', true);
+                
+                // Update meeting links section
+                const meetingLinksSection = document.getElementById('meetingLinks');
+                const providerLinkElement = document.getElementById('providerLink');
+                const customerLinkElement = document.getElementById('customerLink');
+                const generateLinksButton = document.getElementById('generateLinks');
+                
+                // Check if booking has meeting links
+                if (booking.provider_link && booking.customer && booking.customer.customer_link) {
+                    providerLinkElement.innerHTML = `<strong>Provider Link:</strong> <a href="${booking.provider_link}" target="_blank">${booking.provider_link}</a>`;
+                    customerLinkElement.innerHTML = `<strong>Customer Link:</strong> <a href="${booking.customer.customer_link}" target="_blank">${booking.customer.customer_link}</a>`;
+                } else {
+                    // Auto-generate meeting links if they don't exist
+                    try {
+                        const linksResult = await apiRequest(`booking/${id}/meeting-links`, 'GET');
+                        
+                        if (linksResult.ok && linksResult.data.links) {
+                            providerLinkElement.innerHTML = `<strong>Provider Link:</strong> <a href="${linksResult.data.links.provider_link}" target="_blank">${linksResult.data.links.provider_link}</a>`;
+                            customerLinkElement.innerHTML = `<strong>Customer Link:</strong> <a href="${linksResult.data.links.customer_link}" target="_blank">${linksResult.data.links.customer_link}</a>`;
+                        } else {
+                            providerLinkElement.innerHTML = '<em>Could not generate provider link</em>';
+                            customerLinkElement.innerHTML = '<em>Could not generate customer link</em>';
+                        }
+                    } catch (error) {
+                        console.error('Error auto-generating meeting links:', error);
+                        providerLinkElement.innerHTML = '<em>Error generating provider link</em>';
+                        customerLinkElement.innerHTML = '<em>Error generating customer link</em>';
+                    }
+                }
+                
+                // Set up generate links button
+                generateLinksButton.onclick = async function() {
+                    try {
+                        generateLinksButton.disabled = true;
+                        generateLinksButton.textContent = 'Generating...';
+                        
+                        const result = await apiRequest(`booking/${booking.id}/meeting-links`, 'POST');
+                        
+                        if (result.ok && result.data.links) {
+                            providerLinkElement.innerHTML = `<strong>Provider Link:</strong> <a href="${result.data.links.provider_link}" target="_blank">${result.data.links.provider_link}</a>`;
+                            customerLinkElement.innerHTML = `<strong>Customer Link:</strong> <a href="${result.data.links.customer_link}" target="_blank">${result.data.links.customer_link}</a>`;
+                            
+                            showMessage('Meeting links regenerated successfully', 'success');
+                        } else {
+                            showMessage('Failed to generate meeting links: ' + (result.data.error || 'Unknown error'), 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error generating meeting links:', error);
+                        showMessage('An error occurred while generating meeting links', 'error');
+                    } finally {
+                        generateLinksButton.disabled = false;
+                        generateLinksButton.textContent = 'Generate Meeting Links';
+                    }
+                };
+                
+                // Show meeting links section
+                meetingLinksSection.style.display = 'block';
             } else {
                 alert('Error loading booking details: ' + (result.data.error || 'Unknown error'));
             }
@@ -743,6 +807,41 @@
         window.onload = function() {
             checkStoredAuth();
         };
+        
+        // Helper function to show messages
+        function showMessage(message, type = 'info') {
+            const messageElement = document.getElementById('messageArea') || document.createElement('div');
+            
+            if (!document.getElementById('messageArea')) {
+                messageElement.id = 'messageArea';
+                messageElement.style.padding = '10px';
+                messageElement.style.margin = '10px 0';
+                messageElement.style.borderRadius = '5px';
+                document.body.insertBefore(messageElement, document.body.firstChild);
+            }
+            
+            // Set styles based on message type
+            if (type === 'error') {
+                messageElement.style.backgroundColor = '#ffebee';
+                messageElement.style.color = '#c62828';
+                messageElement.style.border = '1px solid #ef9a9a';
+            } else if (type === 'success') {
+                messageElement.style.backgroundColor = '#e8f5e9';
+                messageElement.style.color = '#2e7d32';
+                messageElement.style.border = '1px solid #a5d6a7';
+            } else {
+                messageElement.style.backgroundColor = '#e3f2fd';
+                messageElement.style.color = '#1565c0';
+                messageElement.style.border = '1px solid #90caf9';
+            }
+            
+            messageElement.textContent = message;
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                messageElement.style.display = 'none';
+            }, 5000);
+        }
     </script>
 
     <div style="margin-top: 40px; padding: 20px; border-top: 1px solid #ccc;">

@@ -132,5 +132,31 @@ if (preg_match('#^auth/new-token$#', $uri)) {
     exit;
 }
 
+// Add these routes right before the "For all other routes..." section
+
+// Digital Samba meeting links routes
+if (preg_match('#^booking/([^/]+)/meeting-links$#', $uri, $matches)) {
+    $bookingId = $matches[1];
+    
+    try {
+        $controller = new \App\Controllers\DigitalSambaController();
+        
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            $_SERVER['PATH_INFO'] = "/booking/{$bookingId}/meeting-links";
+            $controller->getMeetingLinks($bookingId);
+        } else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $_SERVER['PATH_INFO'] = "/booking/{$bookingId}/meeting-links";
+            $controller->generateMeetingLinks($bookingId);
+        }
+    } catch (\Exception $e) {
+        error_log("Error handling meeting links request: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode([
+            'error' => 'Failed to process request: ' . $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
 // For all other routes, include the main application entry point
 include_once __DIR__ . '/public/index.php';

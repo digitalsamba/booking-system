@@ -52,11 +52,31 @@ class BookingController extends BaseController {
             return;
         }
         
-        Response::json([
-            'success' => true,
-            'message' => 'Booking created successfully',
-            'booking_id' => $result['id'] ?? null
-        ], 201);
+        // After creating the booking successfully:
+        if ($bookingId) {
+            // Get the created booking
+            $booking = $this->getById($bookingId);
+            
+            // Generate meeting links
+            try {
+                $digitalSambaController = new \App\Controllers\DigitalSambaController();
+                $digitalSambaController->generateMeetingLinks($bookingId);
+                
+                // Refresh booking data to include links
+                $booking = $this->getById($bookingId);
+            } catch (\Exception $e) {
+                error_log("Failed to generate meeting links: " . $e->getMessage());
+                // Continue without links
+            }
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Booking created successfully',
+                'booking' => $booking
+            ], 201);
+        } else {
+            Response::json(['error' => 'Failed to create booking'], 500);
+        }
     }
     
     /**
