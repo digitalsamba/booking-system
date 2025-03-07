@@ -39,43 +39,100 @@ class PublicController extends BaseController {
     }
     
     /**
-     * Get availability slots for a provider by username
+     * Get public availability for a provider
      */
     public function availability() {
-        // Get username from query parameters
-        $username = isset($_GET['username']) ? $_GET['username'] : null;
+        try {
+            error_log("PUBLIC CONTROLLER: Fetching availability");
+            
+            // Get query parameters
+            $username = $_GET['username'] ?? null;
+            $startDate = $_GET['start_date'] ?? date('Y-m-d');
+            $endDate = $_GET['end_date'] ?? date('Y-m-d', strtotime('+7 days'));
+            
+            if (!$username) {
+                Response::json(['error' => 'Username is required'], 400);
+                return;
+            }
+            
+            // Find user by username
+            $userModel = new \App\Models\UserModel();
+            $user = $userModel->findByUsername($username);
+            
+            error_log("User data from findByUsername: " . json_encode($user));
+            
+            if (!$user) {
+                Response::json(['error' => 'User not found'], 404);
+                return;
+            }
+            
+            // Use 'id' field instead of '_id'
+            $userId = $user['id'] ?? null;
+            
+            if (!$userId) {
+                error_log("ERROR: No ID found in user data: " . json_encode($user));
+                Response::json(['error' => 'User ID not found'], 500);
+                return;
+            }
+            
+            error_log("Getting availability for user ID: " . $userId);
+            
+            // Get availability for the user
+            $availabilityModel = new \App\Models\AvailabilityModel();
+            $slots = $availabilityModel->getSlots($userId, $startDate, $endDate, false);
+            
+            // Group slots by date
+            $slotsByDate = $this->groupSlotsByDate($slots);
+            
+            // Return slots
+            Response::json([
+                'success' => true,
+                'provider' => [
+                    'id' => $user['id'],
+                    'username' => $user['username']
+                ],
+                'slots' => $slots,
+                'slots_by_date' => $slotsByDate
+            ]);
+        } catch (\Exception $e) {
+            error_log("ERROR in public availability: " . $e->getMessage());
+            Response::json(['error' => 'Failed to fetch availability'], 500);
+        }
+    }
+    
+    /**
+     * Group slots by date
+     * 
+     * @param array $slots Array of slots
+     * @return array Slots grouped by date
+     */
+    private function groupSlotsByDate(array $slots): array {
+        $groupedSlots = [];
         
-        if (!$username) {
-            Response::json(['error' => 'Provider username is required'], 400);
-            return;
+        foreach ($slots as $slot) {
+            // Extract date from start_time (format: YYYY-MM-DD HH:MM:SS)
+            $date = substr($slot['start_time'], 0, 10);
+            
+            if (!isset($groupedSlots[$date])) {
+                $groupedSlots[$date] = [
+                    'date' => $date,
+                    'slots' => []
+                ];
+            }
+            
+            // Extract time from start_time and end_time
+            $startTime = substr($slot['start_time'], 11, 5);
+            $endTime = substr($slot['end_time'], 11, 5);
+            
+            $groupedSlots[$date]['slots'][] = [
+                'id' => $slot['id'],
+                'start' => $startTime,
+                'end' => $endTime
+            ];
         }
         
-        // Find user by username
-        $user = $this->userModel->findByUsername($username);
-        
-        if (!$user) {
-            Response::json(['error' => 'Provider not found'], 404);
-            return;
-        }
-        
-        // Get date range from query parameters
-        $startDate = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-d');
-        $endDate = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d', strtotime('+7 days'));
-        
-        // Get available slots
-        $slots = $this->availabilityModel->getSlots($user['_id'], $startDate, $endDate);
-        
-        Response::json([
-            'provider' => [
-                'username' => $username,
-                'id' => (string)$user['_id']
-            ],
-            'date_range' => [
-                'start_date' => $startDate,
-                'end_date' => $endDate
-            ],
-            'slots' => $slots
-        ]);
+        // Convert to indexed array
+        return array_values($groupedSlots);
     }
     
     /**
@@ -110,8 +167,15 @@ class PublicController extends BaseController {
             return;
         }
         
-        // Convert ObjectId to string for getSlot method
-        $providerId = (string)$provider['_id'];
+        // Use 'id' field instead of '_id'
+        $providerId = $provider['id'] ?? null;
+        
+        if (!$providerId) {
+            error_log("BOOKING ERROR: Provider ID not found in provider data: " . json_encode($provider));
+            Response::json(['error' => 'Provider ID not found'], 500);
+            return;
+        }
+        
         error_log("BOOKING DEBUG: Found provider with ID: " . $providerId);
         
         // Find the slot
@@ -127,7 +191,7 @@ class PublicController extends BaseController {
         error_log("BOOKING DEBUG: Found slot: " . json_encode($slot));
         
         // Check if slot is available
-        if (empty($slot['is_available'])) {
+        if (isset($slot['is_available']) && $slot['is_available'] === false) {
             error_log("BOOKING ERROR: Slot is not available. is_available=" . ($slot['is_available'] ? 'true' : 'false'));
             Response::json(['error' => 'This slot is no longer available'], 409);
             return;
@@ -138,7 +202,10 @@ class PublicController extends BaseController {
             'provider_id' => $providerId,
             'slot_id' => $data['slot_id'],
             'customer' => $data['customer'],
-            'notes' => $data['notes'] ?? ''
+            'notes' => $data['notes'] ?? '',
+            'start_time' => $slot['start_time'],
+            'end_time' => $slot['end_time'],
+            'status' => 'confirmed'
         ];
         
         error_log("BOOKING DEBUG: Creating booking with data: " . json_encode($bookingData));
@@ -153,6 +220,10 @@ class PublicController extends BaseController {
         
         if ($booking) {
             error_log("BOOKING SUCCESS: Booking created with ID: " . ($booking['id'] ?? 'unknown'));
+            
+            // Mark the slot as unavailable
+            $slotMarked = $this->availabilityModel->markSlotUnavailable($data['slot_id'], $providerId);
+            error_log("BOOKING DEBUG: Slot marked unavailable: " . ($slotMarked ? 'yes' : 'no'));
             
             // Double-check that the slot was marked as unavailable
             $updatedSlot = $this->availabilityModel->getSlot($data['slot_id'], $providerId);

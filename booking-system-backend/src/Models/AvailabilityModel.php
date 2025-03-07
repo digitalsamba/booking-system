@@ -11,6 +11,9 @@ use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
 
 class AvailabilityModel extends BaseModel {
+    /**
+     * Constructor
+     */
     public function __construct() {
         parent::__construct('availability');
     }
@@ -90,9 +93,10 @@ class AvailabilityModel extends BaseModel {
      * @param string $userId The user ID
      * @param string $startDate Start date (Y-m-d)
      * @param string $endDate End date (Y-m-d)
+     * @param bool $requireAuth Whether to require authentication
      * @return array Array of slots
      */
-    public function getSlots(string $userId, string $startDate, string $endDate): array {
+    public function getSlots(string $userId, string $startDate, string $endDate, bool $requireAuth = false): array {
         try {
             $userObjectId = new ObjectId($userId);
             $startDateTime = $this->toMongoDate($startDate . " 00:00:00");
@@ -103,9 +107,13 @@ class AvailabilityModel extends BaseModel {
                 'start_time' => [
                     '$gte' => $startDateTime,
                     '$lte' => $endDateTime
-                ],
-                'is_available' => true
+                ]
             ];
+            
+            // Only show available slots if this is a public query
+            if (!$requireAuth) {
+                $filter['is_available'] = true;
+            }
             
             $options = [
                 'sort' => ['start_time' => 1]
@@ -129,9 +137,10 @@ class AvailabilityModel extends BaseModel {
      * Get next seven days availability slots
      *
      * @param string|null $userId The user ID (nullable)
+     * @param bool $requireAuth Whether authentication is required
      * @return array Array of slots
      */
-    public function getNextSevenDaysSlots(?string $userId): array {
+    public function getNextSevenDaysSlots(?string $userId, bool $requireAuth = false): array {
         if (!$userId) {
             return [];
         }
@@ -139,7 +148,7 @@ class AvailabilityModel extends BaseModel {
         $startDate = date('Y-m-d');
         $endDate = date('Y-m-d', strtotime('+7 days'));
         
-        return $this->getSlots($userId, $startDate, $endDate);
+        return $this->getSlots($userId, $startDate, $endDate, $requireAuth);
     }
     
     /**
@@ -174,8 +183,6 @@ class AvailabilityModel extends BaseModel {
      * @return array|null The slot or null if not found
      */
     public function getSlot(string $id, string $userId): ?array {
-        error_log("AVAILABILITY MODEL: Getting slot ID: {$id} for user ID: {$userId}");
-        
         try {
             $slotId = new ObjectId($id);
             $userObjectId = new ObjectId($userId);
@@ -186,17 +193,12 @@ class AvailabilityModel extends BaseModel {
             ]);
             
             if (!$document) {
-                error_log("AVAILABILITY MODEL: Slot not found");
                 return null;
             }
             
-            $formattedSlot = $this->formatSlotForApi($document);
-            error_log("AVAILABILITY MODEL: Found slot with availability: " . 
-                (isset($formattedSlot['is_available']) ? ($formattedSlot['is_available'] ? 'true' : 'false') : 'unknown'));
-            
-            return $formattedSlot;
+            return $this->formatSlotForApi($document);
         } catch (\Exception $e) {
-            error_log("AVAILABILITY MODEL ERROR: Exception while getting slot: " . $e->getMessage());
+            error_log("Error getting slot: " . $e->getMessage());
             return null;
         }
     }
@@ -210,8 +212,6 @@ class AvailabilityModel extends BaseModel {
      * @return bool True if successful, false otherwise
      */
     public function updateSlot(string $id, array $data, string $userId): bool {
-        error_log("AVAILABILITY MODEL: Updating slot ID: {$id} for user ID: {$userId} with data: " . json_encode($data));
-        
         try {
             $slotId = new ObjectId($id);
             $userObjectId = new ObjectId($userId);
@@ -219,34 +219,22 @@ class AvailabilityModel extends BaseModel {
             $update = [];
             
             if (isset($data['start_time'])) {
-                error_log("AVAILABILITY MODEL: Setting start_time: " . $data['start_time']);
                 $update['start_time'] = $this->toMongoDate($data['start_time']);
             }
             
             if (isset($data['end_time'])) {
-                error_log("AVAILABILITY MODEL: Setting end_time: " . $data['end_time']);
                 $update['end_time'] = $this->toMongoDate($data['end_time']);
             }
             
             if (isset($data['is_available'])) {
-                $isAvailable = (bool)$data['is_available'];
-                error_log("AVAILABILITY MODEL: Setting is_available: " . ($isAvailable ? 'true' : 'false'));
-                $update['is_available'] = $isAvailable;
+                $update['is_available'] = (bool)$data['is_available'];
             }
             
             if (empty($update)) {
-                error_log("AVAILABILITY MODEL ERROR: No fields to update");
                 return false;
             }
             
             $update['updated_at'] = new UTCDateTime(time() * 1000);
-            
-            // Log the filter and update operations
-            error_log("AVAILABILITY MODEL: Filter: " . json_encode([
-                '_id' => (string)$slotId,
-                'user_id' => (string)$userObjectId
-            ]));
-            error_log("AVAILABILITY MODEL: Update: " . json_encode(['$set' => $update]));
             
             $result = $this->collection->updateOne(
                 [
@@ -256,20 +244,11 @@ class AvailabilityModel extends BaseModel {
                 ['$set' => $update]
             );
             
-            $success = $result->getModifiedCount() > 0;
-            error_log("AVAILABILITY MODEL: Update result - Modified count: {$result->getModifiedCount()}, Matched count: {$result->getMatchedCount()}, Success: " . ($success ? 'true' : 'false'));
-            
-            // If the update operation matched a document but didn't modify anything,
-            // it might mean the document already had the specified field values
-            if ($result->getMatchedCount() > 0 && $result->getModifiedCount() === 0) {
-                error_log("AVAILABILITY MODEL: Document matched but no changes were made. This could mean the slot already had the specified values.");
-                // We'll treat this as a success since the document exists and has the right values
-                return true;
-            }
-            
-            return $success;
+            // If the document was matched but not modified, consider it a success
+            // (it may already have the desired values)
+            return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
         } catch (\Exception $e) {
-            error_log("AVAILABILITY MODEL ERROR: Exception while updating slot: " . $e->getMessage());
+            error_log("Error updating slot: " . $e->getMessage());
             return false;
         }
     }
@@ -315,25 +294,9 @@ class AvailabilityModel extends BaseModel {
      * @return bool Success flag
      */
     public function markSlotUnavailable(string $slotId, string $providerId): bool {
-        error_log("AVAILABILITY MODEL: Marking slot {$slotId} for provider {$providerId} as unavailable");
-        
         try {
             $slotObjectId = new ObjectId($slotId);
             $providerObjectId = new ObjectId($providerId);
-            
-            // Log the current state before update
-            $currentSlot = $this->collection->findOne([
-                '_id' => $slotObjectId,
-                'user_id' => $providerObjectId
-            ]);
-            
-            if (!$currentSlot) {
-                error_log("AVAILABILITY MODEL ERROR: Slot not found for marking unavailable");
-                return false;
-            }
-            
-            error_log("AVAILABILITY MODEL: Current slot state before marking unavailable: " . 
-                (isset($currentSlot['is_available']) ? ($currentSlot['is_available'] ? 'available' : 'already unavailable') : 'availability unknown'));
             
             $result = $this->collection->updateOne(
                 [
@@ -348,29 +311,26 @@ class AvailabilityModel extends BaseModel {
                 ]
             );
             
-            $success = $result->getModifiedCount() > 0;
-            error_log("AVAILABILITY MODEL: markSlotUnavailable result - Modified count: {$result->getModifiedCount()}, Matched count: {$result->getMatchedCount()}, Success: " . ($success ? 'true' : 'false'));
-            
-            // If the update operation matched a document but didn't modify anything,
-            // it might mean the document was already marked as unavailable
-            if ($result->getMatchedCount() > 0 && $result->getModifiedCount() === 0) {
-                error_log("AVAILABILITY MODEL: Slot matched but no changes were made. The slot might already be unavailable.");
-                // Verify the current state
-                $verifySlot = $this->collection->findOne([
-                    '_id' => $slotObjectId,
-                    'user_id' => $providerObjectId
-                ]);
-                
-                if ($verifySlot && isset($verifySlot['is_available']) && $verifySlot['is_available'] === false) {
-                    error_log("AVAILABILITY MODEL: Verified that slot is indeed marked as unavailable");
-                    return true;
-                }
-            }
-            
-            return $success;
+            // If the document was matched but not modified, consider it a success
+            // (it may already be marked as unavailable)
+            return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
         } catch (\Exception $e) {
-            error_log("AVAILABILITY MODEL ERROR: Exception while marking slot unavailable: " . $e->getMessage());
+            error_log("Error marking slot unavailable: " . $e->getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Get public availability for a provider
+     * This is a non-authenticated endpoint that should be used for public queries
+     *
+     * @param string $providerId Provider/User ID
+     * @param string $startDate Start date (Y-m-d)
+     * @param string $endDate End date (Y-m-d)
+     * @return array Array of available slots
+     */
+    public function getPublicAvailability(string $providerId, string $startDate, string $endDate): array {
+        // For public endpoints, we only return available slots
+        return $this->getSlots($providerId, $startDate, $endDate, false);
     }
 }

@@ -57,51 +57,64 @@ class AuthController extends BaseController {
     }
     
     /**
-     * Login user
+     * Handle user login
      */
     public function login() {
-        // Get JSON input data
-        $data = $this->getJsonData();
+        // Get request data
+        $data = json_decode(file_get_contents('php://input'), true);
         
         // Validate required fields
-        if (!isset($data['username'], $data['password'])) {
-            Response::json(['error' => 'Missing required fields'], 400);
+        if (!isset($data['username']) || !isset($data['password'])) {
+            Response::json(['error' => 'Username and password are required'], 400);
             return;
         }
         
-        try {
-            // Find user by username
-            $user = $this->userModel->findByUsername($data['username']);
-            
-            if (!$user) {
-                Response::json(['error' => 'User not found'], 404);
-                return;
-            }
-            
-            // Verify password
-            if (!password_verify($data['password'], $user['password'])) {
-                Response::json(['error' => 'Invalid password'], 401);
-                return;
-            }
-            
-            // Generate JWT token
-            $jwt = $this->generateJwt($user);
-            
-            Response::json([
-                'message' => 'Login successful',
-                'token' => $jwt,
-                'user' => [
-                    'id' => isset($user['_id']) ? (string)$user['_id'] : '',
-                    'username' => $user['username'],
-                    'email' => $user['email'],
-                    'role' => $user['role'] ?? 'user'
-                ]
-            ]);
-        } catch (\Exception $e) {
-            // Log the error
-            error_log("Login error: " . $e->getMessage());
-            Response::json(['error' => 'Server error during login: ' . $e->getMessage()], 500);
+        // Log login attempt for debugging
+        error_log("Login attempt for username: " . $data['username']);
+        
+        // Find user by username
+        $userModel = new \App\Models\UserModel();
+        $user = $userModel->findByUsername($data['username']);
+        
+        // Debug the user data
+        error_log("User data found: " . ($user ? json_encode($user) : 'No user found'));
+        
+        // Verify user and password
+        if (!$user || !password_verify($data['password'], $user['password'])) {
+            Response::json(['error' => 'Invalid username or password'], 401);
+            return;
         }
+        
+        // Make sure user has a valid ID
+        if (empty($user['id'])) {
+            error_log("ERROR: User found but has no ID: " . json_encode($user));
+            Response::json(['error' => 'Authentication error: User ID not found'], 500);
+            return;
+        }
+        
+        // Generate JWT token
+        $tokenData = [
+            'id' => $user['id'],  // Use 'id' to match what getUserId() looks for
+            'username' => $user['username'],
+            'role' => $user['role'] ?? 'user'
+        ];
+        
+        error_log("Generating token with data: " . json_encode($tokenData));
+        $token = \App\Utils\JwtAuth::generateToken($tokenData);
+        
+        // Return response with token and user info
+        $response = [
+            'success' => true,
+            'token' => $token,
+            'user' => [
+                'id' => $user['id'],
+                'username' => $user['username'],
+                'email' => $user['email'] ?? '',
+                'role' => $user['role'] ?? 'user'
+            ]
+        ];
+        
+        Response::json($response);
     }
     
     /**

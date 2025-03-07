@@ -37,54 +37,65 @@ class BaseModel {
      * Format a MongoDB document to be returned as API response
      * 
      * @param array $document MongoDB document
-     * @return array Formatted document
+     * @return array|null Formatted document
      */
     protected function formatDocument($document) {
         if (!$document) {
             return null;
         }
         
+        $result = (array)$document;
+        
         // Convert MongoDB ObjectId to string
-        if (isset($document['_id']) && $document['_id'] instanceof ObjectId) {
-            $document['_id'] = (string)$document['_id'];
+        if (isset($result['_id']) && $result['_id'] instanceof ObjectId) {
+            $result['id'] = (string)$result['_id'];
+            unset($result['_id']);
         }
         
         // Convert MongoDB dates to readable format
         $dateFields = ['created_at', 'updated_at', 'start_time', 'end_time'];
         foreach ($dateFields as $field) {
-            if (isset($document[$field]) && $document[$field] instanceof UTCDateTime) {
-                $document[$field] = $document[$field]->toDateTime()->format('Y-m-d H:i:s');
+            if (isset($result[$field]) && $result[$field] instanceof UTCDateTime) {
+                $result[$field] = $result[$field]->toDateTime()->format('Y-m-d H:i:s');
             }
         }
         
-        return $document;
+        return $result;
     }
     
     /**
      * Convert standard date string to MongoDB UTCDateTime
      * 
-     * @param string|int $date Date string or timestamp
-     * @return UTCDateTime
+     * @param string|int|\DateTime|UTCDateTime $date Date string, timestamp or object
+     * @return UTCDateTime|null MongoDB date object or null on failure
      */
     protected function toMongoDate($date) {
-        if (is_numeric($date)) {
-            return new UTCDateTime($date * 1000);
+        try {
+            if ($date instanceof UTCDateTime) {
+                return $date;
+            }
+            
+            if ($date instanceof \DateTime) {
+                return new UTCDateTime($date->getTimestamp() * 1000);
+            }
+            
+            if (is_numeric($date)) {
+                return new UTCDateTime((int)$date * 1000);
+            }
+            
+            if (is_string($date)) {
+                $timestamp = strtotime($date);
+                if ($timestamp === false) {
+                    return null;
+                }
+                return new UTCDateTime($timestamp * 1000);
+            }
+            
+            return null;
+        } catch (\Exception $e) {
+            error_log("Error converting to MongoDB date: " . $e->getMessage());
+            return null;
         }
-        
-        return new UTCDateTime(strtotime($date) * 1000);
-    }
-    
-    /**
-     * Format ObjectId to string
-     * 
-     * @param ObjectId|string $id
-     * @return string
-     */
-    protected function formatId($id) {
-        if ($id instanceof ObjectId) {
-            return (string)$id;
-        }
-        return $id;
     }
     
     /**
@@ -97,6 +108,7 @@ class BaseModel {
         try {
             return new ObjectId($id);
         } catch (\Exception $e) {
+            error_log("Error converting to ObjectId: " . $e->getMessage());
             return null;
         }
     }
@@ -118,5 +130,55 @@ class BaseModel {
             'created_at' => $now,
             'updated_at' => $now
         ];
+    }
+    
+    /**
+     * Find a document by ID
+     * 
+     * @param string $id Document ID
+     * @return array|null Document data or null if not found
+     */
+    public function getById($id) {
+        try {
+            $objectId = $this->toObjectId($id);
+            if (!$objectId) {
+                return null;
+            }
+            
+            $document = $this->collection->findOne(['_id' => $objectId]);
+            return $document ? $this->formatDocument($document) : null;
+        } catch (\Exception $e) {
+            error_log("Error finding document by ID: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Update a document
+     * 
+     * @param string $id Document ID
+     * @param array $data Update data
+     * @return bool Success flag
+     */
+    public function update($id, array $data) {
+        try {
+            $objectId = $this->toObjectId($id);
+            if (!$objectId) {
+                return false;
+            }
+            
+            // Add update timestamp
+            $data = array_merge($data, $this->timestamps(true));
+            
+            $result = $this->collection->updateOne(
+                ['_id' => $objectId],
+                ['$set' => $data]
+            );
+            
+            return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
+        } catch (\Exception $e) {
+            error_log("Error updating document: " . $e->getMessage());
+            return false;
+        }
     }
 }

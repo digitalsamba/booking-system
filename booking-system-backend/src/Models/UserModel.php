@@ -82,7 +82,7 @@ class UserModel extends BaseModel {
      * @param array $userData User data
      * @return array|bool New user data or false if registration failed
      */
-    public function register(array $userData): array|bool {
+    public function register(array $userData) {
         try {
             // Validate required fields
             if (empty($userData['username']) || empty($userData['email']) || empty($userData['password'])) {
@@ -102,18 +102,17 @@ class UserModel extends BaseModel {
                 'username' => $userData['username'],
                 'email' => $userData['email'],
                 'password' => $hashedPassword,
-                'role' => 'user',
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s')
+                'role' => $userData['role'] ?? 'user',
+                'created_at' => new UTCDateTime(time() * 1000),
+                'updated_at' => new UTCDateTime(time() * 1000)
             ];
             
-            // Add Digital Samba credentials if provided
-            if (!empty($userData['developer_key'])) {
-                $newUser['developer_key'] = $userData['developer_key'];
-            }
-            
-            if (!empty($userData['team_id'])) {
-                $newUser['team_id'] = $userData['team_id'];
+            // Add optional fields if provided
+            $optionalFields = ['first_name', 'last_name', 'phone', 'developer_key', 'team_id'];
+            foreach ($optionalFields as $field) {
+                if (!empty($userData[$field])) {
+                    $newUser[$field] = $userData[$field];
+                }
             }
             
             // Insert into database
@@ -123,6 +122,15 @@ class UserModel extends BaseModel {
                 // Get the inserted user
                 $newUser['id'] = (string)$result->getInsertedId();
                 unset($newUser['password']); // Remove password from returned data
+                
+                // Convert MongoDB dates to readable format
+                if ($newUser['created_at'] instanceof UTCDateTime) {
+                    $newUser['created_at'] = $newUser['created_at']->toDateTime()->format('Y-m-d H:i:s');
+                }
+                if ($newUser['updated_at'] instanceof UTCDateTime) {
+                    $newUser['updated_at'] = $newUser['updated_at']->toDateTime()->format('Y-m-d H:i:s');
+                }
+                
                 return $newUser;
             }
             
@@ -142,7 +150,18 @@ class UserModel extends BaseModel {
     public function findByUsername(string $username) {
         try {
             $user = $this->collection->findOne(['username' => $username]);
-            return $user ? $this->formatDocument($user) : null;
+            
+            if (!$user) {
+                return null;
+            }
+            
+            // Convert to array and ensure ID is properly formatted as string
+            $userData = $this->formatDocument($user);
+            
+            // Debug to see the structure
+            error_log("User data from findByUsername: " . json_encode($userData));
+            
+            return $userData;
         } catch (\Exception $e) {
             error_log("Error finding user by username: " . $e->getMessage());
             return null;
@@ -184,17 +203,20 @@ class UserModel extends BaseModel {
     /**
      * Update a user
      * 
-     * @param string $id User ID
+     * @param string|ObjectId $id User ID
      * @param array $data Data to update
      * @return bool Success flag
      */
-    public function update(string $id, array $data) {
+    public function update($id, array $data) {
         try {
             // Add update timestamp
             $data['updated_at'] = new UTCDateTime(time() * 1000);
             
+            // Convert string ID to ObjectId if needed
+            $objectId = ($id instanceof ObjectId) ? $id : new ObjectId($id);
+            
             $result = $this->collection->updateOne(
-                ['_id' => new ObjectId($id)],
+                ['_id' => $objectId],
                 ['$set' => $data]
             );
             
@@ -209,10 +231,11 @@ class UserModel extends BaseModel {
      * Update user password
      * 
      * @param string $id User ID
-     * @param string $hashedPassword New hashed password
+     * @param string $password New password (plain text)
      * @return bool Success flag
      */
-    public function updatePassword(string $id, string $hashedPassword) {
+    public function updatePassword(string $id, string $password) {
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
         return $this->update($id, ['password' => $hashedPassword]);
     }
     
@@ -224,5 +247,29 @@ class UserModel extends BaseModel {
      */
     public function toArray($document = null) {
         return $this->formatDocument($document);
+    }
+
+    /**
+     * Format MongoDB document
+     * 
+     * @param array $document MongoDB document
+     * @return array Formatted array
+     */
+    protected function formatDocument($document) {
+        if (!$document) {
+            return null;
+        }
+        
+        $result = [];
+        
+        foreach ($document as $key => $value) {
+            if ($key === '_id') {
+                $result['id'] = (string)$value; // Convert ObjectId to string
+            } else {
+                $result[$key] = $value;
+            }
+        }
+        
+        return $result;
     }
 }

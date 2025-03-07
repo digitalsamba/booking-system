@@ -75,82 +75,92 @@ class BookingModel extends BaseModel {
      * Create a new booking
      * 
      * @param array $data Booking data
-     * @return array|bool The created booking or false on failure
+     * @return array|bool The booking document or false on failure
      */
     public function create(array $data) {
         error_log("BOOKING MODEL: Creating booking with data: " . json_encode($data));
         
         try {
             // Validate required data
-            if (empty($data['provider_id']) || empty($data['slot_id']) || empty($data['customer'])) {
-                error_log("BOOKING MODEL ERROR: Missing required data fields");
-                return false;
-            }
-            
-            // Get the slot to make sure it exists and is available
-            error_log("BOOKING MODEL: Checking slot ID: " . $data['slot_id'] . " for provider ID: " . $data['provider_id']);
-            $slot = $this->availabilityModel->getSlot($data['slot_id'], $data['provider_id']);
-            
-            if (!$slot) {
-                error_log("BOOKING MODEL ERROR: Slot not found");
-                return false;
-            }
-            
-            error_log("BOOKING MODEL: Found slot: " . json_encode($slot));
-            
-            if (empty($slot['is_available'])) {
-                error_log("BOOKING MODEL ERROR: Slot is not available. is_available=" . 
-                    ($slot['is_available'] ? 'true' : 'false'));
+            if (empty($data['provider_id'])) {
+                error_log("BOOKING MODEL ERROR: Missing provider_id field");
                 return false;
             }
             
             // Create the booking document
-            $bookingId = new ObjectId();
-            
             $booking = [
-                '_id' => $bookingId,
-                'provider_id' => new ObjectId($data['provider_id']),
-                'slot_id' => new ObjectId($data['slot_id']),
-                'customer' => $data['customer'],
-                'notes' => $data['notes'] ?? '',
-                'status' => 'confirmed',
-                'created_at' => new UTCDateTime(time() * 1000),
-                'updated_at' => new UTCDateTime(time() * 1000)
+                'provider_id' => $this->toObjectId($data['provider_id']),
+                'status' => $data['status'] ?? 'confirmed'
             ];
             
-            // Add start and end times if available in the slot
-            if (!empty($slot['start_time'])) {
-                $booking['start_time'] = new UTCDateTime(strtotime($slot['start_time']) * 1000);
+            // Add customer_id if available, otherwise use customer object data
+            if (!empty($data['customer_id'])) {
+                $booking['customer_id'] = $this->toObjectId($data['customer_id']);
+            } elseif (!empty($data['customer']) && is_array($data['customer'])) {
+                // For public bookings, we don't have a customer_id, just customer info
+                $booking['customer'] = $data['customer'];
+            } else {
+                error_log("BOOKING MODEL ERROR: Missing customer information - need either customer_id or customer object");
+                return false;
             }
             
-            if (!empty($slot['end_time'])) {
-                $booking['end_time'] = new UTCDateTime(strtotime($slot['end_time']) * 1000);
+            // Add optional fields
+            $optionalFields = ['service_id', 'notes', 'slot_id'];
+            foreach ($optionalFields as $field) {
+                if (isset($data[$field])) {
+                    if ($field === 'slot_id') {
+                        $booking[$field] = $this->toObjectId($data[$field]);
+                    } else {
+                        $booking[$field] = $data[$field];
+                    }
+                }
             }
             
-            error_log("BOOKING MODEL: Inserting booking document into database");
+            // Add start and end times
+            if (!empty($data['start_time'])) {
+                $booking['start_time'] = $this->toMongoDate($data['start_time']);
+            }
+            
+            if (!empty($data['end_time'])) {
+                $booking['end_time'] = $this->toMongoDate($data['end_time']);
+            }
+            
+            // Add timestamps
+            $booking = array_merge($booking, $this->timestamps());
+            
+            error_log("BOOKING MODEL: Inserting booking document into database: " . json_encode($booking));
             
             // Insert booking
             $result = $this->collection->insertOne($booking);
             
             if ($result->getInsertedCount() > 0) {
-                error_log("BOOKING MODEL: Booking inserted with ID: " . (string)$bookingId);
+                $bookingId = (string)$result->getInsertedId();
+                error_log("BOOKING MODEL: Booking inserted with ID: " . $bookingId);
                 
-                // Mark the slot as unavailable
-                error_log("BOOKING MODEL: Marking slot as unavailable using updateSlot method");
-                $updateResult = $this->availabilityModel->updateSlot(
-                    $data['slot_id'],
-                    ['is_available' => false],
-                    $data['provider_id']
-                );
-                error_log("BOOKING MODEL: Slot marked as unavailable. Update result: " . json_encode($updateResult));
+                // If slot_id is provided, mark the slot as unavailable
+                if (!empty($data['slot_id']) && !empty($data['provider_id'])) {
+                    error_log("BOOKING MODEL: Marking slot as unavailable");
+                    $this->availabilityModel->updateSlot(
+                        $data['slot_id'],
+                        ['is_available' => false],
+                        $data['provider_id']
+                    );
+                }
                 
-                return $booking;
+                // Get the created booking
+                $createdBooking = $this->getById($bookingId);
+                if (!$createdBooking) {
+                    $createdBooking = ['id' => $bookingId];
+                }
+                
+                return $createdBooking;
             }
             
             error_log("BOOKING MODEL ERROR: Failed to insert booking");
             return false;
         } catch (\Exception $e) {
             error_log("BOOKING MODEL ERROR: Exception occurred while creating booking: " . $e->getMessage());
+            error_log("BOOKING MODEL ERROR: " . $e->getTraceAsString());
             return false;
         }
     }
@@ -312,11 +322,11 @@ class BookingModel extends BaseModel {
     /**
      * Update a booking
      *
-     * @param string $id The booking ID
+     * @param string|ObjectId $id The booking ID
      * @param array $data The booking data to update
      * @return bool True if successful, false otherwise
      */
-    public function update(string $id, array $data): bool {
+    public function update($id, array $data) {
         $objectId = $this->toObjectId($id);
         if (!$objectId) {
             return false;
@@ -350,37 +360,29 @@ class BookingModel extends BaseModel {
      * @return bool Success
      */
     public function cancel($bookingId) {
-        try {
-            $result = $this->collection->updateOne(
-                ['_id' => new ObjectId($bookingId)],
-                [
-                    '$set' => [
-                        'status' => 'cancelled',
-                        'updated_at' => new UTCDateTime(time() * 1000)
-                    ]
-                ]
-            );
-            
-            return $result->getModifiedCount() > 0;
-        } catch (\Exception $e) {
-            throw new \Exception("Error cancelling booking: " . $e->getMessage());
-        }
+        return $this->updateStatus($bookingId, 'cancelled');
     }
     
     /**
      * Get booking by ID
      *
-     * @param string $id Booking ID
-     * @return array|null Booking data or null if not found
+     * @param string|ObjectId $id Booking ID
+     * @return array|null Booking data
      */
-    public function getById(string $id) {
+    public function getById($id) {
         try {
-            $bookingId = new ObjectId($id);
-            $booking = $this->collection->findOne(['_id' => $bookingId]);
+            // Handle string or ObjectId
+            $objectId = ($id instanceof \MongoDB\BSON\ObjectId) ? $id : new \MongoDB\BSON\ObjectId($id);
             
-            return $booking ? $this->formatBooking($booking) : null;
+            $booking = $this->collection->findOne(['_id' => $objectId]);
+            
+            if (!$booking) {
+                return null;
+            }
+            
+            return $this->formatDocument($booking);
         } catch (\Exception $e) {
-            error_log("Error getting booking: " . $e->getMessage());
+            error_log("Error getting booking by ID: " . $e->getMessage());
             return null;
         }
     }
@@ -429,38 +431,36 @@ class BookingModel extends BaseModel {
         $result = [
             'id' => (string)($booking['_id'] ?? ''),
             'provider_id' => (string)($booking['provider_id'] ?? ''),
-            'customer' => $booking['customer'] ?? [],
-            'notes' => $booking['notes'] ?? '',
+            'customer_id' => (string)($booking['customer_id'] ?? ''),
             'status' => $booking['status'] ?? 'confirmed',
         ];
         
-        // Add slot_id if exists
-        if (isset($booking['slot_id'])) {
-            $result['slot_id'] = (string)$booking['slot_id'];
+        // Add customer object if it exists
+        if (isset($booking['customer'])) {
+            $result['customer'] = $booking['customer'];
         }
         
-        // Process date fields
-        $dateFields = ['start_time', 'end_time', 'date', 'created_at', 'updated_at'];
-        foreach ($dateFields as $field) {
+        // Add optional fields
+        $optionalFields = ['service_id', 'notes', 'slot_id', 'provider_link'];
+        foreach ($optionalFields as $field) {
             if (isset($booking[$field])) {
-                if ($booking[$field] instanceof \MongoDB\BSON\UTCDateTime) {
-                    // Convert MongoDB UTCDateTime to string
-                    $result[$field] = $booking[$field]->toDateTime()->format('Y-m-d\TH:i:s');
+                if ($field === 'slot_id') {
+                    $result[$field] = (string)$booking[$field];
                 } else {
                     $result[$field] = $booking[$field];
                 }
             }
         }
         
-        // Add any additional fields
-        foreach ($booking as $key => $value) {
-            if (!isset($result[$key]) && $key !== '_id') {
-                if ($value instanceof \MongoDB\BSON\UTCDateTime) {
-                    $result[$key] = $value->toDateTime()->format('Y-m-d\TH:i:s');
-                } else if ($value instanceof \MongoDB\BSON\ObjectId) {
-                    $result[$key] = (string)$value;
+        // Process date fields
+        $dateFields = ['start_time', 'end_time', 'created_at', 'updated_at'];
+        foreach ($dateFields as $field) {
+            if (isset($booking[$field])) {
+                if ($booking[$field] instanceof UTCDateTime) {
+                    // Convert MongoDB UTCDateTime to string
+                    $result[$field] = $booking[$field]->toDateTime()->format('Y-m-d\TH:i:s');
                 } else {
-                    $result[$key] = $value;
+                    $result[$field] = $booking[$field];
                 }
             }
         }
@@ -476,26 +476,9 @@ class BookingModel extends BaseModel {
      * @return bool Success flag
      */
     public function updateStatus(string $id, string $status): bool {
-        try {
-            $bookingId = new ObjectId($id);
-            
-            $result = $this->collection->updateOne(
-                ['_id' => $bookingId],
-                [
-                    '$set' => [
-                        'status' => $status,
-                        'updated_at' => new UTCDateTime(time() * 1000)
-                    ]
-                ]
-            );
-            
-            return $result->getModifiedCount() > 0;
-        } catch (\Exception $e) {
-            error_log("Error updating booking status: " . $e->getMessage());
-            return false;
-        }
+        return $this->update($id, ['status' => $status]);
     }
-
+    
     /**
      * Get bookings with filtering, pagination and sorting
      * 
@@ -515,27 +498,14 @@ class BookingModel extends BaseModel {
             
             // Apply filters
             if (!empty($filter)) {
-                // Provider filter - convert string ID to MongoDB ObjectId
+                // Provider filter
                 if (isset($filter['provider_id'])) {
-                    $providerId = $filter['provider_id'];
-                    
-                    // Debug log
-                    error_log("Original provider_id filter value: " . json_encode($providerId));
-                    
-                    // Handle provider_id as MongoDB ObjectId
-                    if (is_string($providerId) && strlen($providerId) === 24) {
-                        try {
-                            $query['provider_id'] = new \MongoDB\BSON\ObjectId($providerId);
-                            error_log("Converted provider_id to MongoDB ObjectId");
-                        } catch (\Exception $e) {
-                            error_log("Failed to convert provider_id to ObjectId: " . $e->getMessage());
-                            // Fallback to string comparison
-                            $query['provider_id'] = $providerId;
-                        }
-                    } else {
-                        // Use as is
-                        $query['provider_id'] = $providerId;
-                    }
+                    $query['provider_id'] = $this->toObjectId($filter['provider_id']);
+                }
+                
+                // Customer filter
+                if (isset($filter['customer_id'])) {
+                    $query['customer_id'] = $this->toObjectId($filter['customer_id']);
                 }
                 
                 // Status filter
@@ -551,16 +521,14 @@ class BookingModel extends BaseModel {
                         $startDate = $filter['date_range']['start'];
                         $startDateTime = new \DateTime($startDate);
                         $startDateTime->setTime(0, 0, 0);
-                        $dateQuery['$gte'] = new \MongoDB\BSON\UTCDateTime($startDateTime->getTimestamp() * 1000);
-                        error_log("Start date filter: " . $startDateTime->format('Y-m-d H:i:s'));
+                        $dateQuery['$gte'] = new UTCDateTime($startDateTime->getTimestamp() * 1000);
                     }
                     
                     if (isset($filter['date_range']['end'])) {
                         $endDate = $filter['date_range']['end'];
                         $endDateTime = new \DateTime($endDate);
                         $endDateTime->setTime(23, 59, 59);
-                        $dateQuery['$lte'] = new \MongoDB\BSON\UTCDateTime($endDateTime->getTimestamp() * 1000);
-                        error_log("End date filter: " . $endDateTime->format('Y-m-d H:i:s'));
+                        $dateQuery['$lte'] = new UTCDateTime($endDateTime->getTimestamp() * 1000);
                     }
                     
                     if (!empty($dateQuery)) {
@@ -569,12 +537,8 @@ class BookingModel extends BaseModel {
                 }
             }
             
-            // Add debug logging
-            error_log("Final MongoDB query: " . json_encode($query));
-            
             // Get total count
             $totalCount = $this->collection->countDocuments($query);
-            error_log("Total matching documents: " . $totalCount);
             
             // Calculate skip value for pagination
             $skip = ($page - 1) * $limit;
@@ -589,16 +553,10 @@ class BookingModel extends BaseModel {
             // Get bookings
             $cursor = $this->collection->find($query, $options);
             $bookings = [];
-            $count = 0;
             
             foreach ($cursor as $document) {
-                $count++;
-                $booking = $this->formatBooking($document);
-                error_log("Processing booking ID: " . ($booking['id'] ?? 'unknown'));
-                $bookings[] = $booking;
+                $bookings[] = $this->formatBooking($document);
             }
-            
-            error_log("Retrieved {$count} booking documents");
             
             return [
                 'items' => $bookings,
@@ -610,8 +568,57 @@ class BookingModel extends BaseModel {
                 ]
             ];
         } catch (\Exception $e) {
-            error_log("Error in getBookings: " . $e->getMessage() . "\n" . $e->getTraceAsString());
-            throw $e;
+            error_log("Error in getBookings: " . $e->getMessage());
+            return [
+                'items' => [],
+                'pagination' => [
+                    'total' => 0,
+                    'page' => $page,
+                    'limit' => $limit,
+                    'pages' => 0
+                ]
+            ];
+        }
+    }
+    
+    /**
+     * Add meeting links to a booking
+     * 
+     * @param string $id Booking ID
+     * @param string $providerLink Provider's meeting link
+     * @param string $customerLink Customer's meeting link
+     * @param string $meetingId Optional meeting ID
+     * @return bool Success flag
+     */
+    public function addMeetingLinks($id, $providerLink, $customerLink, $meetingId = null) {
+        try {
+            // Get the current booking
+            $booking = $this->getById($id);
+            if (!$booking) {
+                return false;
+            }
+            
+            $updateData = [
+                'provider_link' => $providerLink
+            ];
+            
+            // Update customer object with link
+            $customer = $booking['customer'] ?? [];
+            if (!is_array($customer)) {
+                $customer = ['id' => $booking['customer_id'] ?? $id];
+            }
+            $customer['customer_link'] = $customerLink;
+            $updateData['customer'] = $customer;
+            
+            // Add meeting ID if provided
+            if ($meetingId) {
+                $updateData['meeting_id'] = $meetingId;
+            }
+            
+            return $this->update($id, $updateData);
+        } catch (\Exception $e) {
+            error_log("Error adding meeting links: " . $e->getMessage());
+            return false;
         }
     }
 }

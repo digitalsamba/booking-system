@@ -246,6 +246,7 @@
                 
                 // Add auth token if available
                 if (authData.token) {
+                    console.log("Adding auth token to request headers");
                     options.headers['Authorization'] = `Bearer ${authData.token}`;
                 }
                 
@@ -253,6 +254,9 @@
                 if (data && (method === 'POST' || method === 'PUT')) {
                     options.body = JSON.stringify(data);
                 }
+                
+                // Log the actual headers being sent (for debugging)
+                console.log("Request headers:", JSON.stringify(options.headers));
                 
                 // Make the API request
                 const response = await fetch(endpoint, options);
@@ -388,6 +392,10 @@
         
         // View availability slots
         async function viewAvailability() {
+            // Clear previous results
+            document.getElementById('view-availability-result').innerHTML = '';
+            document.getElementById('availability-list').innerHTML = '';
+            
             // Check if user is logged in
             if (!authData.token) {
                 document.getElementById('view-availability-result').innerHTML = 
@@ -395,34 +403,48 @@
                 return;
             }
             
-            // Get date range
-            const startDate = document.getElementById('view-start-date').value;
-            const endDate = document.getElementById('view-end-date').value;
-            
-            if (!startDate) {
+            try {
+                // Get date range
+                const startDate = document.getElementById('view-start-date').value;
+                const endDate = document.getElementById('view-end-date').value;
+                
+                if (!startDate) {
+                    document.getElementById('view-availability-result').innerHTML = 
+                        '<p class="error">Start date is required</p>';
+                    return;
+                }
+                
+                // Build query string
+                let queryString = `availability?start_date=${encodeURIComponent(startDate)}`;
+                if (endDate) {
+                    queryString += `&end_date=${encodeURIComponent(endDate)}`;
+                }
+                
+                // Make API request
+                console.log("Making availability request to:", queryString);
+                console.log("Auth token:", authData.token.substring(0, 20) + "...");
+                
+                // Debug info for the network request
                 document.getElementById('view-availability-result').innerHTML = 
-                    '<p class="error">Start date is required</p>';
-                return;
-            }
-            
-            // Build query string
-            let queryString = `?start_date=${startDate}`;
-            if (endDate) {
-                queryString += `&end_date=${endDate}`;
-            }
-            
-            // Make API request
-            const result = await apiRequest(`availability${queryString}`);
-            
-            // Handle response
-            if (result.ok) {
-                const slots = result.data.slots || [];
+                    '<p>Sending request... Please wait.</p>';
+                
+                const result = await apiRequest(queryString);
+                
+                // Handle response
+                if (result.ok) {
+                    const slots = result.data.slots || [];
+                    document.getElementById('view-availability-result').innerHTML = 
+                        `<p class="success">Found ${slots.length} availability slots</p>`;
+                    displayAvailabilitySlots(slots);
+                } else {
+                    document.getElementById('view-availability-result').innerHTML = 
+                        `<p class="error">Failed to fetch availability: ${result.data.error || 'Unknown error'}</p>`;
+                    document.getElementById('availability-list').innerHTML = '';
+                }
+            } catch (error) {
+                console.error("Error in viewAvailability:", error);
                 document.getElementById('view-availability-result').innerHTML = 
-                    `<p class="success">Found ${slots.length} availability slots</p>`;
-                displayAvailabilitySlots(slots);
-            } else {
-                document.getElementById('view-availability-result').innerHTML = 
-                    `<p class="error">Failed to fetch availability: ${result.data.error || 'Unknown error'}</p>`;
+                    `<p class="error">Error: ${error.message}</p>`;
                 document.getElementById('availability-list').innerHTML = '';
             }
         }

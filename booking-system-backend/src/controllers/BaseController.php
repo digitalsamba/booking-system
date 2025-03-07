@@ -61,32 +61,50 @@ abstract class BaseController {
             $token = $this->getBearerToken();
             
             if (!$token) {
+                error_log("No bearer token found in request");
                 return null;
             }
             
-            $secret = defined('JWT_SECRET') ? JWT_SECRET : 'default_secret_change_this';
-            $decoded = JWT::decode($token, new Key($secret, 'HS256'));
+            // Log token for debugging (only in development)
+            error_log("Token received in getUserId: " . substr($token, 0, 20) . "...");
             
-            return $decoded->data->id ?? null;
-        } catch (Exception $e) {
-            error_log("JWT validation error: " . $e->getMessage());
+            $decoded = \App\Utils\JwtAuth::validateToken($token);
+            
+            if (!$decoded) {
+                error_log("Token validation failed");
+                return null;
+            }
+            
+            // Debug the structure of the decoded token
+            error_log("Decoded token data type: " . gettype($decoded->data));
+            
+            // Check for user ID in both possible locations - id or user_id
+            if (!empty($decoded->data->id)) {
+                return $decoded->data->id;
+            } else if (!empty($decoded->data->user_id)) {
+                return $decoded->data->user_id;
+            } else {
+                // Log what fields actually exist in the token
+                $fields = [];
+                foreach ($decoded->data as $key => $value) {
+                    $fields[] = $key;
+                }
+                error_log("No user ID found in token. Available fields: " . implode(', ', $fields));
+                return null;
+            }
+        } catch (\Exception $e) {
+            error_log("Error extracting user ID from token: " . $e->getMessage());
             return null;
         }
     }
     
     /**
-     * Get Bearer token from Authorization header
+     * Get bearer token from Authorization header
      *
-     * @return string|null The token or null if not found
+     * @return string|null Bearer token or null if not found
      */
     protected function getBearerToken(): ?string {
-        $headers = getallheaders();
-        $auth = $headers['Authorization'] ?? '';
-        
-        if (preg_match('/Bearer\s(\S+)/', $auth, $matches)) {
-            return $matches[1];
-        }
-        
-        return null;
+        // Use the JwtAuth utility method
+        return \App\Utils\JwtAuth::getTokenFromHeader();
     }
 }

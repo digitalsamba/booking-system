@@ -42,17 +42,18 @@ class JwtAuth {
     /**
      * Generate a JWT token
      *
-     * @param array $payload The token payload
+     * @param array $payload The token payload (user data)
+     * @param int $expiry Expiry time in seconds (default: use JWT_EXPIRY or 24 hours)
      * @return string The JWT token
      */
-    public static function generateToken($payload) {
+    public static function generateToken($payload, $expiry = null) {
         if (!defined('JWT_SECRET')) {
             error_log('JWT_SECRET is not defined in config.php');
             throw new \Exception('JWT configuration error');
         }
         
         $issuedAt = time();
-        $expiration = $issuedAt + (defined('JWT_EXPIRY') ? JWT_EXPIRY : 86400); // Default 24 hours
+        $expiration = $issuedAt + ($expiry ?? (defined('JWT_EXPIRY') ? JWT_EXPIRY : 86400)); // Default 24 hours
         
         $tokenPayload = [
             'iat' => $issuedAt,
