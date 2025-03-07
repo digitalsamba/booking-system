@@ -49,7 +49,7 @@ abstract class BaseController {
     protected function requireAuth(): bool {
         $this->userId = $this->getUserId();
         if (!$this->userId) {
-            Response::json(['error' => 'Authentication required'], 401);
+            $this->error('Authentication required', 401);
             return false;
         }
         
@@ -151,12 +151,135 @@ abstract class BaseController {
     }
     
     /**
-     * Get ID from URL path
-     *
-     * @return string|null
+     * Send error response
+     * 
+     * @param string $message Error message
+     * @param int $code HTTP status code
+     * @param array $details Additional error details
+     * @return void
      */
-    protected function getIdFromPath(): ?string {
-        $pathParts = explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
-        return $pathParts[1] ?? null;
+    protected function error(string $message, int $code = 400, array $details = []): void {
+        $response = ['error' => $message];
+        
+        if (!empty($details)) {
+            $response['details'] = $details;
+        }
+        
+        Response::json($response, $code);
+    }
+
+    /**
+     * Get query parameter with optional default value
+     * 
+     * @param string $name Parameter name
+     * @param mixed $default Default value if parameter not found
+     * @return mixed Parameter value or default
+     */
+    protected function getQueryParam(string $name, $default = null) {
+        return $_GET[$name] ?? $default;
+    }
+
+    /**
+     * Validate required fields in data array
+     * 
+     * @param array $data Data to validate
+     * @param array $requiredFields Required field names
+     * @return array|null Array of missing fields or null if all fields present
+     */
+    protected function validateRequiredFields(array $data, array $requiredFields): ?array {
+        $missing = [];
+        
+        foreach ($requiredFields as $field) {
+            if (empty($data[$field])) {
+                $missing[] = $field;
+            }
+        }
+        
+        return empty($missing) ? null : $missing;
+    }
+
+    /**
+     * Send success response
+     * 
+     * @param mixed $data Response data
+     * @param int $code HTTP status code
+     * @return void
+     */
+    protected function success($data = [], int $code = 200): void {
+        $response = ['success' => true];
+        
+        if (is_array($data)) {
+            $response = array_merge($response, $data);
+        } else {
+            $response['data'] = $data;
+        }
+        
+        Response::json($response, $code);
+    }
+
+    /**
+     * Get path parts from URL
+     * 
+     * @return array Array of URL path segments
+     */
+    protected function getPathParts(): array {
+        return explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
+    }
+
+    /**
+     * Get resource ID from URL path (usually second segment)
+     * 
+     * @param int $position Position of the ID in path segments (default: 1)
+     * @return string|null Resource ID or null if not found
+     */
+    protected function getIdFromPath(int $position = 1): ?string {
+        $parts = $this->getPathParts();
+        return $parts[$position] ?? null;
+    }
+
+    /**
+     * Check if the current request matches a given HTTP method
+     *
+     * @param string $method HTTP method to check (GET, POST, etc)
+     * @return bool True if request method matches
+     */
+    protected function isMethod(string $method): bool {
+        return strtoupper($_SERVER['REQUEST_METHOD']) === strtoupper($method);
+    }
+
+    /**
+     * Check if current request is a GET request
+     *
+     * @return bool
+     */
+    protected function isGet(): bool {
+        return $this->isMethod('GET');
+    }
+
+    /**
+     * Check if current request is a POST request
+     *
+     * @return bool
+     */
+    protected function isPost(): bool {
+        return $this->isMethod('POST');
+    }
+
+    /**
+     * Check if current request is a PUT request
+     *
+     * @return bool
+     */
+    protected function isPut(): bool {
+        return $this->isMethod('PUT');
+    }
+
+    /**
+     * Check if current request is a DELETE request
+     *
+     * @return bool
+     */
+    protected function isDelete(): bool {
+        return $this->isMethod('DELETE');
     }
 }

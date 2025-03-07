@@ -38,11 +38,10 @@ class BookingController extends BaseController {
         
         // Validate required fields
         $requiredFields = ['slot_id', 'customer'];
-        foreach ($requiredFields as $field) {
-            if (empty($data[$field])) {
-                Response::json(['error' => "Missing required field: {$field}"], 400);
-                return;
-            }
+        $missing = $this->validateRequiredFields($data, $requiredFields);
+        if ($missing) {
+            $this->error("Missing required fields: " . implode(', ', $missing), 400);
+            return;
         }
         
         // Add provider ID from auth
@@ -52,12 +51,12 @@ class BookingController extends BaseController {
         $slot = $this->availabilityModel->getSlot($data['slot_id'], $this->userId);
         
         if (!$slot) {
-            Response::json(['error' => 'Slot not found'], 404);
+            $this->error('Slot not found', 404);
             return;
         }
         
         if (isset($slot['is_available']) && $slot['is_available'] === false) {
-            Response::json(['error' => 'This slot is no longer available'], 409);
+            $this->error('This slot is no longer available', 409);
             return;
         }
         
@@ -69,15 +68,14 @@ class BookingController extends BaseController {
         $booking = $this->bookingModel->create($data);
         
         if (!$booking) {
-            Response::json(['error' => 'Failed to create booking'], 500);
+            $this->error('Failed to create booking', 500);
             return;
         }
         
         // Generate meeting links if applicable
         $this->generateMeetingLinks($booking['id']);
         
-        Response::json([
-            'success' => true,
+        $this->success([
             'message' => 'Booking created successfully',
             'booking' => $booking
         ], 201);
@@ -107,11 +105,11 @@ class BookingController extends BaseController {
         }
         
         // Get query parameters
-        $startDate = $_GET['start_date'] ?? null;
-        $endDate = $_GET['end_date'] ?? null;
-        $status = $_GET['status'] ?? null;
-        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 20;
-        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $startDate = $this->getQueryParam('start_date');
+        $endDate = $this->getQueryParam('end_date');
+        $status = $this->getQueryParam('status');
+        $limit = (int)$this->getQueryParam('limit', 20);
+        $page = (int)$this->getQueryParam('page', 1);
         
         // Build filter
         $filter = ['provider_id' => $this->userId];
@@ -130,10 +128,10 @@ class BookingController extends BaseController {
         try {
             // Get bookings
             $result = $this->bookingModel->getBookings($filter, $page, $limit);
-            Response::json($result);
+            $this->success($result);
         } catch (\Exception $e) {
             error_log("Error retrieving bookings: " . $e->getMessage());
-            Response::json(['error' => 'Failed to retrieve bookings'], 500);
+            $this->error('Failed to retrieve bookings', 500);
         }
     }
     
@@ -149,7 +147,7 @@ class BookingController extends BaseController {
         $id = $id ?? $this->getIdFromPath();
         
         if (!$id) {
-            Response::json(['error' => 'Booking ID is required'], 400);
+            $this->error('Booking ID is required', 400);
             return;
         }
         
@@ -157,17 +155,17 @@ class BookingController extends BaseController {
         $booking = $this->bookingModel->getById($id);
         
         if (!$booking) {
-            Response::json(['error' => 'Booking not found'], 404);
+            $this->error('Booking not found', 404);
             return;
         }
         
         // Check permissions
         if ($booking['provider_id'] !== $this->userId && $this->userRole !== 'admin') {
-            Response::json(['error' => 'You do not have permission to view this booking'], 403);
+            $this->error('You do not have permission to view this booking', 403);
             return;
         }
         
-        Response::json($booking);
+        $this->success($booking);
     }
     
     /**
@@ -182,7 +180,7 @@ class BookingController extends BaseController {
         $id = $id ?? $this->getIdFromPath();
         
         if (!$id) {
-            Response::json(['error' => 'Booking ID is required'], 400);
+            $this->error('Booking ID is required', 400);
             return;
         }
         
@@ -190,19 +188,19 @@ class BookingController extends BaseController {
         $booking = $this->bookingModel->getById($id);
         
         if (!$booking) {
-            Response::json(['error' => 'Booking not found'], 404);
+            $this->error('Booking not found', 404);
             return;
         }
         
         // Check permissions
         if ($booking['provider_id'] !== $this->userId && $this->userRole !== 'admin') {
-            Response::json(['error' => 'You do not have permission to cancel this booking'], 403);
+            $this->error('You do not have permission to cancel this booking', 403);
             return;
         }
         
         // Check if already cancelled
         if ($booking['status'] === 'cancelled') {
-            Response::json(['error' => 'Booking is already cancelled'], 400);
+            $this->error('Booking is already cancelled', 400);
             return;
         }
         
@@ -216,12 +214,11 @@ class BookingController extends BaseController {
                     ['is_available' => true], $booking['provider_id']);
             }
             
-            Response::json([
-                'success' => true,
+            $this->success([
                 'message' => 'Booking cancelled successfully'
             ]);
         } else {
-            Response::json(['error' => 'Failed to cancel booking'], 500);
+            $this->error('Failed to cancel booking', 500);
         }
     }
     
@@ -229,7 +226,7 @@ class BookingController extends BaseController {
      * Route booking detail requests
      */
     public function details() {
-        $pathParts = explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
+        $pathParts = $this->getPathParts();
         
         // Check if path pattern is /booking/{id}/...
         if (count($pathParts) >= 2) {
@@ -238,7 +235,7 @@ class BookingController extends BaseController {
             // Check for specific action
             $action = $pathParts[2] ?? '';
             
-            if ($action === 'cancel' && $_SERVER['REQUEST_METHOD'] === 'PUT') {
+            if ($action === 'cancel' && $this->isPut()) {
                 return $this->cancel($id);
             }
             
@@ -246,6 +243,6 @@ class BookingController extends BaseController {
             return $this->view($id);
         }
         
-        Response::json(['error' => 'Invalid URL pattern'], 404);
+        $this->error('Invalid URL pattern', 404);
     }
 }

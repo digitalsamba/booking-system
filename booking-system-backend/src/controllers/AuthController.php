@@ -21,20 +21,16 @@ class AuthController extends BaseController {
     /**
      * Register a new user
      */
-    public function register() {
+    public function register(): void {
         // Get JSON input data
         $data = $this->getJsonData();
         
         // Validate required fields
         $requiredFields = ['username', 'email', 'password'];
-        foreach ($requiredFields as $field) {
-            if (empty($data[$field])) {
-                Response::json([
-                    'error' => 'Missing required field',
-                    'field' => $field
-                ], 400);
-                return;
-            }
+        $missing = $this->validateRequiredFields($data, $requiredFields);
+        if ($missing) {
+            $this->error("Missing required fields: " . implode(', ', $missing), 400);
+            return;
         }
         
         // Create the user model
@@ -44,15 +40,12 @@ class AuthController extends BaseController {
         $user = $userModel->register($data);
         
         if ($user) {
-            Response::json([
+            $this->success([
                 'message' => 'User registered successfully',
                 'user' => $user
             ], 201);
         } else {
-            Response::json([
-                'error' => 'Registration failed',
-                'details' => 'Username or email may already be in use'
-            ], 400);
+            $this->error('Registration failed', 400, ['details' => 'Username or email may already be in use']);
         }
     }
     
@@ -65,7 +58,7 @@ class AuthController extends BaseController {
         
         // Validate required fields
         if (!isset($data['username']) || !isset($data['password'])) {
-            Response::json(['error' => 'Username and password are required'], 400);
+            $this->error('Username and password are required', 400);
             return;
         }
         
@@ -81,14 +74,14 @@ class AuthController extends BaseController {
         
         // Verify user and password
         if (!$user || !password_verify($data['password'], $user['password'])) {
-            Response::json(['error' => 'Invalid username or password'], 401);
+            $this->error('Invalid username or password', 401);
             return;
         }
         
         // Make sure user has a valid ID
         if (empty($user['id'])) {
             error_log("ERROR: User found but has no ID: " . json_encode($user));
-            Response::json(['error' => 'Authentication error: User ID not found'], 500);
+            $this->error('Authentication error: User ID not found', 500);
             return;
         }
         
@@ -114,8 +107,7 @@ class AuthController extends BaseController {
             ]
         ];
         
-        Response::json($response);
-    }
+        $this->success($response);    }
     
     /**
      * Test endpoint
@@ -152,7 +144,7 @@ class AuthController extends BaseController {
         error_log("Generated new test token: " . substr($token, 0, 20) . "...");
         
         // Return response
-        Response::json([
+        $this->success([
             'token' => $token,
             'user' => [
                 'id' => $userId,

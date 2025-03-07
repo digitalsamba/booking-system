@@ -29,7 +29,7 @@ class DigitalSambaController extends BaseController {
                 
                 if (!$bookingId) {
                     error_log("Could not extract booking ID from path: " . ($_SERVER['PATH_INFO'] ?? 'N/A'));
-                    Response::json(['error' => 'Booking ID is required'], 400);
+                    $this->error('Booking ID is required', 400);
                     return;
                 }
             }
@@ -41,7 +41,7 @@ class DigitalSambaController extends BaseController {
             $booking = $bookingModel->getById($bookingId);
             
             if (!$booking) {
-                Response::json(['error' => 'Booking not found'], 404);
+                $this->error('Booking not found', 404);
                 return;
             }
             
@@ -75,8 +75,7 @@ class DigitalSambaController extends BaseController {
                 // Get updated booking
                 $updatedBooking = $bookingModel->getById($bookingId);
                 
-                Response::json([
-                    'success' => true,
+                $this->success([
                     'message' => 'Meeting links generated successfully',
                     'links' => [
                         'provider_link' => $providerLink,
@@ -85,11 +84,11 @@ class DigitalSambaController extends BaseController {
                     'booking' => $updatedBooking
                 ]);
             } else {
-                Response::json(['error' => 'Failed to update booking with meeting links'], 500);
+                $this->error('Failed to update booking with meeting links', 500);
             }
         } catch (\Exception $e) {
             error_log("Error in DigitalSambaController::generateMeetingLinks: " . $e->getMessage());
-            Response::json(['error' => 'Failed to generate meeting links: ' . $e->getMessage()], 500);
+            $this->error('Failed to generate meeting links', 500, ['details' => $e->getMessage()]);
         }
     }
     
@@ -112,7 +111,7 @@ class DigitalSambaController extends BaseController {
                 
                 if (!$bookingId) {
                     error_log("Could not extract booking ID from path: " . ($_SERVER['PATH_INFO'] ?? 'N/A'));
-                    Response::json(['error' => 'Booking ID is required'], 400);
+                    $this->error('Booking ID is required', 400);
                     return;
                 }
             }
@@ -124,7 +123,7 @@ class DigitalSambaController extends BaseController {
             $booking = $bookingModel->getById($bookingId);
             
             if (!$booking) {
-                Response::json(['error' => 'Booking not found'], 404);
+                $this->error('Booking not found', 404);
                 return;
             }
             
