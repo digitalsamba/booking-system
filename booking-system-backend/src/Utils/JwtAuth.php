@@ -29,11 +29,10 @@ class JwtAuth {
         // Try to get from the defined constant
         if (defined('JWT_SECRET')) {
             self::$secret = JWT_SECRET;
-            error_log("Secret loaded from JWT_SECRET constant: " . substr(self::$secret, 0, 3) . "...");
         } else {
-            // Fallback secret for development only - NOT SECURE FOR PRODUCTION!
-            self::$secret = 'default-jwt-secret-for-development-only';
-            error_log("WARNING: Using hardcoded fallback JWT secret - not secure for production!");
+            // Log error and use a fallback (not recommended for production)
+            error_log("WARNING: JWT_SECRET not defined! Using fallback secret, which is insecure.");
+            self::$secret = 'fallback-jwt-secret-do-not-use-in-production';
         }
         
         return self::$secret;
