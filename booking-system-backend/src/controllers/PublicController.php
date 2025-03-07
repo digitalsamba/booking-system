@@ -26,12 +26,19 @@ class PublicController extends BaseController {
     }
     
     /**
-     * Default index action
+     * Default index action - API information
+     * 
+     * This method merges functionality from DefaultController
+     * 
+     * @return void
      */
     public function index() {
         Response::json([
-            'message' => 'Public API endpoints',
-            'endpoints' => [
+            'status' => 'ok',
+            'message' => 'Booking System API',
+            'version' => '1.0.0',
+            'public_endpoints' => [
+                'GET /public - API information',
                 'GET /public/availability - Get available slots for a provider',
                 'POST /public/booking - Create a new booking'
             ]
