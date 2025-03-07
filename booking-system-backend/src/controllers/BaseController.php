@@ -26,14 +26,14 @@ abstract class BaseController {
         $json = file_get_contents('php://input');
         
         if (empty($json)) {
-            error_log("WARNING: Empty request body in " . get_class($this));
+            $this->debug("Empty request body received");
             return [];
         }
         
         $data = json_decode($json, true);
         
         if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log("JSON decode error: " . json_last_error_msg() . " in " . get_class($this));
+            $this->debug("JSON decode error", json_last_error_msg());
             return [];
         }
         
@@ -75,22 +75,22 @@ abstract class BaseController {
             $token = $this->getBearerToken();
             
             if (!$token) {
-                error_log("No bearer token found in request");
+                $this->debug("No bearer token found in request");
                 return null;
             }
             
             // Log token for debugging (only in development)
-            error_log("Token received in getUserId: " . substr($token, 0, 20) . "...");
+            $this->debug("Token received", substr($token, 0, 20) . "...");
             
             $decoded = \App\Utils\JwtAuth::validateToken($token);
             
             if (!$decoded) {
-                error_log("Token validation failed");
+                $this->debug("Token validation failed");
                 return null;
             }
             
             // Debug the structure of the decoded token
-            error_log("Decoded token data type: " . gettype($decoded->data));
+            $this->debug("Decoded token data type", gettype($decoded->data));
             
             // Check for user ID in both possible locations - id or user_id
             if (!empty($decoded->data->id)) {
@@ -103,11 +103,11 @@ abstract class BaseController {
                 foreach ($decoded->data as $key => $value) {
                     $fields[] = $key;
                 }
-                error_log("No user ID found in token. Available fields: " . implode(', ', $fields));
+                $this->debug("No user ID found in token. Available fields", implode(', ', $fields));
                 return null;
             }
         } catch (\Exception $e) {
-            error_log("Error extracting user ID from token: " . $e->getMessage());
+            $this->debug("Error extracting user ID from token", $e->getMessage());
             return null;
         }
     }
@@ -281,5 +281,30 @@ abstract class BaseController {
      */
     protected function isDelete(): bool {
         return $this->isMethod('DELETE');
+    }
+
+    /**
+     * Log debug message (only if DEBUG is enabled)
+     * 
+     * @param string $message Message to log
+     * @param mixed $data Optional data to include
+     * @return void
+     */
+    protected function debug(string $message, $data = null): void {
+        if (!defined('DEBUG') || !DEBUG) {
+            return;
+        }
+        
+        $logMessage = "[DEBUG] " . get_class($this) . ": " . $message;
+        
+        if ($data !== null) {
+            if (is_array($data) || is_object($data)) {
+                $logMessage .= " - " . json_encode($data);
+            } else {
+                $logMessage .= " - " . $data;
+            }
+        }
+        
+        error_log($logMessage);
     }
 }

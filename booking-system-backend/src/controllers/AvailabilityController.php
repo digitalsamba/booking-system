@@ -32,7 +32,15 @@ class AvailabilityController extends BaseController {
         $startDate = $this->getQueryParam('start_date', date('Y-m-d'));
         $endDate = $this->getQueryParam('end_date', date('Y-m-d', strtotime('+7 days')));
         
+        $this->debug("Fetching availability slots", [
+            'user_id' => $this->userId,
+            'start_date' => $startDate,
+            'end_date' => $endDate
+        ]);
+        
         $slots = $this->availabilityModel->getSlots($this->userId, $startDate, $endDate);
+        
+        $this->debug("Retrieved slots count", count($slots));
         
         $this->success([
             'message' => 'Availability slots retrieved',
@@ -50,9 +58,11 @@ class AvailabilityController extends BaseController {
         
         // Get JSON data
         $data = $this->getJsonData();
+        $this->debug("Adding availability slots", ['slot_count' => isset($data['slots']) ? count($data['slots']) : 0]);
         
         // Validate slots
         if (!isset($data['slots']) || !is_array($data['slots']) || empty($data['slots'])) {
+            $this->debug("Invalid slots data provided");
             $this->error('Invalid slots data - "slots" array is required', 400);
             return;
         }
@@ -61,11 +71,13 @@ class AvailabilityController extends BaseController {
         $result = $this->availabilityModel->addSlots($this->userId, $data['slots']);
         
         if ($result) {
+            $this->debug("Successfully added slots", ['count' => count($data['slots'])]);
             $this->success([
                 'message' => 'Availability slots added successfully',
                 'count' => count($data['slots'])
             ]);
         } else {
+            $this->debug("Failed to add slots");
             $this->error('Failed to add availability slots', 500);
         }
     }
@@ -178,17 +190,27 @@ class AvailabilityController extends BaseController {
         
         // Get JSON data
         $data = $this->getJsonData();
+        $this->debug("Generating availability slots", [
+            'start_date' => $data['start_date'] ?? 'missing',
+            'end_date' => $data['end_date'] ?? 'missing',
+            'slot_duration' => $data['slot_duration'] ?? 'missing'
+        ]);
         
         // Validate required fields
         $requiredFields = ['start_date', 'end_date', 'slot_duration', 'daily_start_time', 'daily_end_time', 'days_of_week'];
         $missing = $this->validateRequiredFields($data, $requiredFields);
         if ($missing) {
+            $this->debug("Missing required fields", $missing);
             $this->error("Missing required fields: " . implode(', ', $missing), 400);
             return;
         }
         
         // Additional validations
         if (!$this->validateDateFormat($data['start_date']) || !$this->validateDateFormat($data['end_date'])) {
+            $this->debug("Invalid date format", [
+                'start_date' => $data['start_date'],
+                'end_date' => $data['end_date']
+            ]);
             $this->error('Invalid date format. Use YYYY-MM-DD', 400);
             return;
         }
@@ -209,6 +231,8 @@ class AvailabilityController extends BaseController {
             $data['days_of_week']
         );
         
+        $this->debug("Slots generated", ['count' => count($slots)]);
+        
         if (empty($slots)) {
             $this->error('No slots could be generated with the given parameters', 400);
             return;
@@ -222,6 +246,7 @@ class AvailabilityController extends BaseController {
                 'count' => count($slots)
             ]);
         } else {
+            $this->debug("Failed to save generated slots");
             $this->error('Failed to save generated availability slots', 500);
         }
     }
@@ -311,10 +336,17 @@ class AvailabilityController extends BaseController {
             $startDate = $this->getQueryParam('start_date', date('Y-m-d'));
             $endDate = $this->getQueryParam('end_date', date('Y-m-d', strtotime('+7 days')));
             
+            $this->debug("Getting availability", [
+                'provider_id' => $providerId ?: 'authenticated user',
+                'start_date' => $startDate,
+                'end_date' => $endDate
+            ]);
+            
             // If provider_id is provided, treat as public query
             if ($providerId) {
                 $slots = $this->availabilityModel->getPublicAvailability($providerId, $startDate, $endDate);
                 
+                $this->debug("Retrieved public availability", ['slot_count' => count($slots)]);
                 $this->success([
                     'slots' => $slots
                 ]);
@@ -329,10 +361,12 @@ class AvailabilityController extends BaseController {
             // Get authenticated user's availability
             $slots = $this->availabilityModel->getSlots($this->userId, $startDate, $endDate, true);
             
+            $this->debug("Retrieved user availability", ['slot_count' => count($slots)]);
             $this->success([
                 'slots' => $slots
             ]);
         } catch (\Exception $e) {
+            $this->debug("Exception in getAvailability", $e->getMessage());
             $this->error('Failed to fetch availability', 500, ['details' => $e->getMessage()]);
         }
     }

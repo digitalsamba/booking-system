@@ -10,7 +10,7 @@ class DebugController extends BaseController {
     /**
      * Debug endpoint to test JWT token generation and validation
      */
-    public function jwtTest() {
+    public function jwtTest(): void {
         // Generate a test JWT token
         $payload = [
             'user_id' => 'test-user-123',
@@ -24,8 +24,7 @@ class DebugController extends BaseController {
         $validationResult = JwtAuth::validateToken($token);
         
         // Return the results
-        Response::json([
-            'success' => true,
+        $this->success([
             'jwt_secret_defined' => defined('JWT_SECRET'),
             'jwt_secret_preview' => defined('JWT_SECRET') ? substr(JWT_SECRET, 0, 3) . '...' : null,
             'token' => $token,

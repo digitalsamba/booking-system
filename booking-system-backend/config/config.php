@@ -79,3 +79,6 @@ define('DB_PORT', getenv('DB_PORT') ? (int)getenv('DB_PORT') : 27017);
 define('DB_NAME', getenv('DB_NAME') ?: 'booking_system');
 define('DB_USER', getenv('DB_USER') ?: '');
 define('DB_PASS', getenv('DB_PASS') ?: '');
+
+// debug logging
+define('DEBUG', $_ENV['APP_ENV'] !== 'production');

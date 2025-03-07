@@ -33,11 +33,8 @@ class AuthController extends BaseController {
             return;
         }
         
-        // Create the user model
-        $userModel = new \App\Models\UserModel();
-        
         // Pass all input data (including developer_key and team_id if present)
-        $user = $userModel->register($data);
+        $user = $this->userModel->register($data);
         
         if ($user) {
             $this->success([
@@ -52,25 +49,25 @@ class AuthController extends BaseController {
     /**
      * Handle user login
      */
-    public function login() {
+    public function login(): void {
         // Get request data
-        $data = json_decode(file_get_contents('php://input'), true);
+        $data = $this->getJsonData(); // Use helper instead of direct json_decode
         
         // Validate required fields
-        if (!isset($data['username']) || !isset($data['password'])) {
-            $this->error('Username and password are required', 400);
+        $missing = $this->validateRequiredFields($data, ['username', 'password']);
+        if ($missing) {
+            $this->error("Missing required fields: " . implode(', ', $missing), 400);
             return;
         }
         
         // Log login attempt for debugging
-        error_log("Login attempt for username: " . $data['username']);
+        $this->debug("Login attempt", $data['username']);
         
         // Find user by username
-        $userModel = new \App\Models\UserModel();
-        $user = $userModel->findByUsername($data['username']);
+        $user = $this->userModel->findByUsername($data['username']);
         
         // Debug the user data
-        error_log("User data found: " . ($user ? json_encode($user) : 'No user found'));
+        $this->debug("User data found", $user ? 'User found' : 'No user found');
         
         // Verify user and password
         if (!$user || !password_verify($data['password'], $user['password'])) {
@@ -80,7 +77,7 @@ class AuthController extends BaseController {
         
         // Make sure user has a valid ID
         if (empty($user['id'])) {
-            error_log("ERROR: User found but has no ID: " . json_encode($user));
+            $this->debug("User found but has no ID", $user);
             $this->error('Authentication error: User ID not found', 500);
             return;
         }
@@ -92,12 +89,11 @@ class AuthController extends BaseController {
             'role' => $user['role'] ?? 'user'
         ];
         
-        error_log("Generating token with data: " . json_encode($tokenData));
+        $this->debug("Generating token with data", $tokenData);
         $token = \App\Utils\JwtAuth::generateToken($tokenData);
         
         // Return response with token and user info
-        $response = [
-            'success' => true,
+        $this->success([
             'token' => $token,
             'user' => [
                 'id' => $user['id'],
@@ -105,15 +101,14 @@ class AuthController extends BaseController {
                 'email' => $user['email'] ?? '',
                 'role' => $user['role'] ?? 'user'
             ]
-        ];
-        
-        $this->success($response);    }
+        ]);
+    }
     
     /**
      * Test endpoint
      */
-    public function test() {
-        Response::json([
+    public function test(): void {
+        $this->success([
             'message' => 'AuthController test endpoint is working!',
             'timestamp' => time()
         ]);
@@ -123,7 +118,7 @@ class AuthController extends BaseController {
      * Generate a new test token
      * (Method name should match 'new-token' in hyphenated-url format)
      */
-    public function newToken() {
+    public function newToken(): void {
         // Get JSON input data
         $data = $this->getJsonData();
         
@@ -141,7 +136,7 @@ class AuthController extends BaseController {
         
         // Generate token
         $token = \App\Utils\JwtAuth::generateToken($payload);
-        error_log("Generated new test token: " . substr($token, 0, 20) . "...");
+        $this->debug("Generated new test token", substr($token, 0, 20) . "...");
         
         // Return response
         $this->success([

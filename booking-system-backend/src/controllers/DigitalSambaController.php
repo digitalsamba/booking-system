@@ -13,7 +13,7 @@ class DigitalSambaController extends BaseController {
     /**
      * Generate meeting links for a booking
      */
-    public function generateMeetingLinks($bookingId = null) {
+    public function generateMeetingLinks(?string $bookingId = null): void {
         try {
             // Use provided booking ID or extract from request
             if (!$bookingId) {
@@ -28,13 +28,13 @@ class DigitalSambaController extends BaseController {
                 }
                 
                 if (!$bookingId) {
-                    error_log("Could not extract booking ID from path: " . ($_SERVER['PATH_INFO'] ?? 'N/A'));
+                    $this->debug("Could not extract booking ID from path", $_SERVER['PATH_INFO'] ?? 'N/A');
                     $this->error('Booking ID is required', 400);
                     return;
                 }
             }
             
-            error_log("Generating meeting links for booking ID: " . $bookingId);
+            $this->debug("Generating meeting links for booking ID", $bookingId);
             
             // Get booking
             $bookingModel = new \App\Models\BookingModel();
@@ -87,15 +87,14 @@ class DigitalSambaController extends BaseController {
                 $this->error('Failed to update booking with meeting links', 500);
             }
         } catch (\Exception $e) {
-            error_log("Error in DigitalSambaController::generateMeetingLinks: " . $e->getMessage());
-            $this->error('Failed to generate meeting links', 500, ['details' => $e->getMessage()]);
+            $this->debug("Error in generateMeetingLinks", $e->getMessage());            $this->error('Failed to generate meeting links', 500, ['details' => $e->getMessage()]);
         }
     }
     
     /**
      * Get meeting links for a booking
      */
-    public function getMeetingLinks($bookingId = null) {
+    public function getMeetingLinks(?string $bookingId = null): void {
         try {
             // Use provided booking ID or extract from request
             if (!$bookingId) {
@@ -134,12 +133,12 @@ class DigitalSambaController extends BaseController {
             
             if (!$providerLink || !$customerLink) {
                 // Generate links if they don't exist
-                return $this->generateMeetingLinks($bookingId);
+                $this->generateMeetingLinks($bookingId);
+                return;
             }
             
             // Return existing links
-            Response::json([
-                'success' => true,
+            $this->success([
                 'links' => [
                     'provider_link' => $providerLink,
                     'customer_link' => $customerLink
@@ -148,7 +147,7 @@ class DigitalSambaController extends BaseController {
             ]);
         } catch (\Exception $e) {
             error_log("Error in DigitalSambaController::getMeetingLinks: " . $e->getMessage());
-            Response::json(['error' => 'Failed to retrieve meeting links: ' . $e->getMessage()], 500);
+            $this->error('Failed to retrieve meeting links', 500, ['details' => $e->getMessage()]);
         }
     }
 }
