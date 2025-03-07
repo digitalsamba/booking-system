@@ -62,9 +62,8 @@ class PublicController extends BaseController {
                 return;
             }
             
-            // Find user by username
-            $userModel = new \App\Models\UserModel();
-            $user = $userModel->findByUsername($username);
+            // Find user by username - Use already instantiated model
+            $user = $this->userModel->findByUsername($username);
             
             error_log("User data from findByUsername: " . json_encode($user));
             
