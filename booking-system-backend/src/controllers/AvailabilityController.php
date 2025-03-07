@@ -44,13 +44,11 @@ class AvailabilityController extends BaseController {
     }
     
     /**
-     * Set availability slots - THIS IS THE MISSING METHOD
+     * Add availability slots
+     * Replaces both set() and addAvailability()
      */
-    public function set() {
-        // Require authentication
-        $userId = $this->getUserId();
-        if (!$userId) {
-            Response::json(['error' => 'Authentication required'], 401);
+    public function add() {
+        if (!$this->requireAuth()) {
             return;
         }
         
@@ -59,25 +57,24 @@ class AvailabilityController extends BaseController {
         
         // Validate slots
         if (!isset($data['slots']) || !is_array($data['slots']) || empty($data['slots'])) {
-            Response::json(['error' => 'Invalid slots data'], 400);
+            Response::json(['error' => 'Invalid slots data - "slots" array is required'], 400);
             return;
         }
         
-        // Set availability slots
-        $result = $this->availabilityModel->addSlots($userId, $data['slots']);
+        // Add slots
+        $result = $this->availabilityModel->addSlots($this->userId, $data['slots']);
         
         if ($result) {
             Response::json([
+                'success' => true,
                 'message' => 'Availability slots added successfully',
                 'count' => count($data['slots'])
             ]);
         } else {
-            Response::json([
-                'error' => 'Failed to add availability slots'
-            ], 500);
+            Response::json(['error' => 'Failed to add availability slots'], 500);
         }
     }
-    
+
     /**
      * Delete a slot
      * 
@@ -151,31 +148,8 @@ class AvailabilityController extends BaseController {
         } else {
             Response::json(['error' => 'Failed to update slot'], 400);
         }
-    }
-    
-
-    
-    /**
-     * Validate date string format (YYYY-MM-DD)
-     *
-     * @param string $date Date string
-     * @return bool True if valid
-     */
-    private function validateDate($date) {
-        $d = DateTime::createFromFormat('Y-m-d', $date);
-        return $d && $d->format('Y-m-d') === $date;
-    }
-    
-    /**
-     * Validate date-time string format (YYYY-MM-DD HH:MM:SS)
-     *
-     * @param string $dateTime Date-time string
-     * @return bool True if valid
-     */
-    private function validateDateTime($dateTime) {
-        $d = DateTime::createFromFormat('Y-m-d H:i:s', $dateTime);
-        return $d && $d->format('Y-m-d H:i:s') === $dateTime;
-    }
+    }    
+   
     
     /**
      * Validate that time slots are in 30-minute intervals
@@ -210,13 +184,10 @@ class AvailabilityController extends BaseController {
 
     /**
      * Generate availability slots
-     * Automatically creates slots based on date range, time range, and days of week
+     * Replaces both generate() and generateAvailability()
      */
     public function generate() {
-        // Require authentication
-        $userId = $this->getUserId();
-        if (!$userId) {
-            Response::json(['error' => 'Authentication required'], 401);
+        if (!$this->requireAuth()) {
             return;
         }
         
@@ -227,67 +198,48 @@ class AvailabilityController extends BaseController {
         $requiredFields = ['start_date', 'end_date', 'slot_duration', 'daily_start_time', 'daily_end_time', 'days_of_week'];
         foreach ($requiredFields as $field) {
             if (!isset($data[$field])) {
-                Response::json(['error' => "Missing required field: $field"], 400);
+                Response::json(['error' => "Missing required field: {$field}"], 400);
                 return;
             }
         }
         
-        // Validate dates
+        // Additional validations
         if (!$this->validateDateFormat($data['start_date']) || !$this->validateDateFormat($data['end_date'])) {
             Response::json(['error' => 'Invalid date format. Use YYYY-MM-DD'], 400);
             return;
         }
         
-        // Validate time format
         if (!$this->validateTimeFormat($data['daily_start_time']) || !$this->validateTimeFormat($data['daily_end_time'])) {
             Response::json(['error' => 'Invalid time format. Use HH:MM'], 400);
             return;
         }
         
-        // Validate slot duration (must be a positive integer)
-        $slotDuration = (int)$data['slot_duration'];
-        if ($slotDuration <= 0) {
-            Response::json(['error' => 'Slot duration must be a positive integer'], 400);
-            return;
-        }
-        
-        // Validate days of week (must be an array of integers 0-6)
-        if (!is_array($data['days_of_week']) || empty($data['days_of_week'])) {
-            Response::json(['error' => 'Days of week must be a non-empty array'], 400);
-            return;
-        }
-        
-        foreach ($data['days_of_week'] as $day) {
-            if (!is_numeric($day) || $day < 0 || $day > 6) {
-                Response::json(['error' => 'Each day must be a number between 0 (Sunday) and 6 (Saturday)'], 400);
-                return;
-            }
-        }
-        
-        // Generate slots
+        // Generate and add slots
         $slots = $this->generateSlots(
-            $userId,
+            $this->userId,
             $data['start_date'],
             $data['end_date'],
             $data['daily_start_time'],
             $data['daily_end_time'],
-            $slotDuration,
+            (int)$data['slot_duration'],
             $data['days_of_week']
         );
         
-        // Add slots to database
-        $result = $this->availabilityModel->addSlots($userId, $slots);
+        if (empty($slots)) {
+            Response::json(['error' => 'No slots could be generated with the given parameters'], 400);
+            return;
+        }
+        
+        $result = $this->availabilityModel->addSlots($this->userId, $slots);
         
         if ($result) {
             Response::json([
+                'success' => true,
                 'message' => 'Availability slots generated successfully',
-                'count' => count($slots),
-                'slots' => $slots
+                'count' => count($slots)
             ]);
         } else {
-            Response::json([
-                'error' => 'Failed to generate availability slots'
-            ], 500);
+            Response::json(['error' => 'Failed to save generated availability slots'], 500);
         }
     }
 
@@ -370,7 +322,7 @@ class AvailabilityController extends BaseController {
      * @param string $date Date string
      * @return bool True if valid
      */
-    private function validateDateFormat($date) {
+    protected function validateDateFormat($date): bool {
         if (!is_string($date)) {
             return false;
         }
@@ -384,7 +336,7 @@ class AvailabilityController extends BaseController {
      * @param string $time Time string
      * @return bool True if valid
      */
-    private function validateTimeFormat($time) {
+    protected function validateTimeFormat($time): bool {
         if (!is_string($time)) {
             return false;
         }
@@ -442,167 +394,6 @@ class AvailabilityController extends BaseController {
             Response::json(['error' => 'Failed to fetch availability: ' . $e->getMessage()], 500);
         }
     }
-    
-    /**
-     * Add availability slots
-     * 
-     * @return void
-     */
-    public function addAvailability() {
-        try {
-            // Verify authentication
-            $userId = $this->getUserId();
-            
-            if (!$userId) {
-                Response::json(['error' => 'Authentication required'], 401);
-                return;
-            }
-            
-            // Get JSON request body
-            $data = json_decode(file_get_contents('php://input'), true);
-            
-            if (!$data || !isset($data['slots']) || !is_array($data['slots'])) {
-                Response::json(['error' => 'Invalid request data. "slots" array is required'], 400);
-                return;
-            }
-            
-            // Add slots to database
-            $result = $this->availabilityModel->addSlots($userId, $data['slots']);
-            
-            if ($result) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Availability slots added successfully'
-                ]);
-            } else {
-                Response::json(['error' => 'Failed to add availability slots'], 500);
-            }
-        } catch (\Exception $e) {
-            error_log("Error in AvailabilityController::addAvailability: " . $e->getMessage());
-            Response::json(['error' => 'Failed to add availability slots: ' . $e->getMessage()], 500);
-        }
-    }
-    
-    /**
-     * Generate availability slots
-     * 
-     * @return void
-     */
-    public function generateAvailability() {
-        try {
-            // Verify authentication
-            $userId = $this->getUserId();
-            
-            if (!$userId) {
-                Response::json(['error' => 'Authentication required'], 401);
-                return;
-            }
-            
-            // Get JSON request body
-            $data = json_decode(file_get_contents('php://input'), true);
-            
-            // Validate required fields
-            $requiredFields = ['start_date', 'end_date', 'slot_duration', 'daily_start_time', 'daily_end_time', 'days_of_week'];
-            foreach ($requiredFields as $field) {
-                if (!isset($data[$field])) {
-                    Response::json(['error' => "Missing required field: {$field}"], 400);
-                    return;
-                }
-            }
-            
-            // Parse dates
-            $startDate = new \DateTime($data['start_date']);
-            $endDate = new \DateTime($data['end_date']);
-            $currentDate = clone $startDate;
-            
-            // Validate date range
-            if ($startDate > $endDate) {
-                Response::json(['error' => 'Start date must be before end date'], 400);
-                return;
-            }
-            
-            // Parse time range
-            $dailyStartTime = \DateTime::createFromFormat('H:i', $data['daily_start_time']);
-            $dailyEndTime = \DateTime::createFromFormat('H:i', $data['daily_end_time']);
-            
-            if (!$dailyStartTime || !$dailyEndTime) {
-                Response::json(['error' => 'Invalid time format. Use HH:MM'], 400);
-                return;
-            }
-            
-            // Validate time range
-            if ($dailyStartTime >= $dailyEndTime) {
-                Response::json(['error' => 'Start time must be before end time'], 400);
-                return;
-            }
-            
-            // Generate slots
-            $slots = [];
-            
-            while ($currentDate <= $endDate) {
-                $dayOfWeek = (int)$currentDate->format('w'); // 0 (Sunday) to 6 (Saturday)
-                
-                // Check if this day of the week is selected
-                if (in_array($dayOfWeek, $data['days_of_week'])) {
-                    // Set start and end times for this day
-                    $slotStart = clone $currentDate;
-                    $slotStart->setTime(
-                        (int)$dailyStartTime->format('H'),
-                        (int)$dailyStartTime->format('i')
-                    );
-                    
-                    $dayEnd = clone $currentDate;
-                    $dayEnd->setTime(
-                        (int)$dailyEndTime->format('H'),
-                        (int)$dailyEndTime->format('i')
-                    );
-                    
-                    // Generate slots for the day
-                    while ($slotStart < $dayEnd) {
-                        $slotEnd = clone $slotStart;
-                        $slotEnd->add(new \DateInterval('PT' . $data['slot_duration'] . 'M'));
-                        
-                        // Only add if the slot end is within the day's end time
-                        if ($slotEnd <= $dayEnd) {
-                            $slots[] = [
-                                'start_time' => $slotStart->format('Y-m-d H:i:s'),
-                                'end_time' => $slotEnd->format('Y-m-d H:i:s')
-                            ];
-                        }
-                        
-                        // Move to next slot
-                        $slotStart = $slotEnd;
-                    }
-                }
-                
-                // Move to next day
-                $currentDate->add(new \DateInterval('P1D'));
-            }
-            
-            // Add slots to database
-            $result = false;
-            $count = count($slots);
-            
-            if ($count > 0) {
-                $result = $this->availabilityModel->addSlots($userId, $slots);
-            }
-            
-            if ($result) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Availability slots generated successfully',
-                    'count' => $count
-                ]);
-            } else {
-                Response::json([
-                    'error' => $count > 0 ? 'Failed to save availability slots' : 'No slots were generated for the given parameters'
-                ], $count > 0 ? 500 : 400);
-            }
-        } catch (\Exception $e) {
-            error_log("Error in AvailabilityController::generateAvailability: " . $e->getMessage());
-            Response::json(['error' => 'Failed to generate availability: ' . $e->getMessage()], 500);
-        }
-    }
 
     /**
      * Format slots by date
@@ -638,5 +429,23 @@ class AvailabilityController extends BaseController {
         
         // Convert to indexed array
         return array_values($formattedSlots);
+    }
+
+    // Add a shared validation method
+    /**
+     * Validate availability data
+     * 
+     * @param array $data Data to validate
+     * @param array $requiredFields Fields to check
+     * @return bool|string True if valid, error message otherwise
+     */
+    private function validateAvailabilityData(array $data, array $requiredFields): bool|string {
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field])) {
+                return "Missing required field: {$field}";
+            }
+        }
+        
+        return true;
     }
 }

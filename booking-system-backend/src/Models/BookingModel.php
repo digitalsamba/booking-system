@@ -109,7 +109,7 @@ class BookingModel extends BaseModel {
             foreach ($optionalFields as $field) {
                 if (isset($data[$field])) {
                     if ($field === 'slot_id') {
-                        $booking[$field] = $this->toObjectId($data[$field]);
+                        $booking[$field] = $data[$field];  // Keep as string for now
                     } else {
                         $booking[$field] = $data[$field];
                     }
@@ -128,7 +128,7 @@ class BookingModel extends BaseModel {
             // Add timestamps
             $booking = array_merge($booking, $this->timestamps());
             
-            error_log("BOOKING MODEL: Inserting booking document into database: " . json_encode($booking));
+            error_log("BOOKING MODEL: Inserting booking document into database");
             
             // Insert booking
             $result = $this->collection->insertOne($booking);
@@ -140,11 +140,16 @@ class BookingModel extends BaseModel {
                 // If slot_id is provided, mark the slot as unavailable
                 if (!empty($data['slot_id']) && !empty($data['provider_id'])) {
                     error_log("BOOKING MODEL: Marking slot as unavailable");
-                    $this->availabilityModel->updateSlot(
-                        $data['slot_id'],
-                        ['is_available' => false],
-                        $data['provider_id']
-                    );
+                    try {
+                        $this->availabilityModel->updateSlot(
+                            $data['slot_id'],
+                            ['is_available' => false],
+                            $data['provider_id']
+                        );
+                    } catch (\Exception $e) {
+                        error_log("BOOKING MODEL ERROR: Failed to mark slot as unavailable: " . $e->getMessage());
+                        // Continue even if this fails - the booking is still created
+                    }
                 }
                 
                 // Get the created booking

@@ -9,73 +9,92 @@ namespace App\Controllers;
 
 use App\Models\BookingModel;
 use App\Models\AvailabilityModel;
+use App\Models\UserModel;
 use App\Utils\Response;
-use App\Utils\JwtAuth; // Change this from JwtUtil to JwtAuth
 
 class BookingController extends BaseController {
     private $bookingModel;
-    protected $userId;
-    protected $userRole;
+    private $availabilityModel;
+    private $userModel;
     
     /**
      * Constructor
      */
     public function __construct() {
         $this->bookingModel = new BookingModel();
+        $this->availabilityModel = new AvailabilityModel();
+        $this->userModel = new UserModel();
     }
     
     /**
-     * Create a new booking
-     * Public endpoint - does not require authentication
+     * Create a new booking (authenticated endpoint)
      */
     public function create() {
-        // Get JSON request data
+        if (!$this->requireAuth()) {
+            return;
+        }
+        
         $data = $this->getJsonData();
         
         // Validate required fields
-        if (empty($data['slot_id']) || empty($data['provider_username']) || empty($data['customer'])) {
-            Response::json(['error' => 'Required fields missing'], 400);
-            return;
-        }
-        
-        // Check customer data
-        if (empty($data['customer']['name']) || empty($data['customer']['email'])) {
-            Response::json(['error' => 'Customer name and email are required'], 400);
-            return;
-        }
-        
-        // Create the booking
-        $result = $this->bookingModel->create($data);
-        
-        if (!$result) {
-            Response::json(['error' => 'Failed to create booking'], 500);
-            return;
-        }
-        
-        // After creating the booking successfully:
-        if ($bookingId) {
-            // Get the created booking
-            $booking = $this->getById($bookingId);
-            
-            // Generate meeting links
-            try {
-                $digitalSambaController = new \App\Controllers\DigitalSambaController();
-                $digitalSambaController->generateMeetingLinks($bookingId);
-                
-                // Refresh booking data to include links
-                $booking = $this->getById($bookingId);
-            } catch (\Exception $e) {
-                error_log("Failed to generate meeting links: " . $e->getMessage());
-                // Continue without links
+        $requiredFields = ['slot_id', 'customer'];
+        foreach ($requiredFields as $field) {
+            if (empty($data[$field])) {
+                Response::json(['error' => "Missing required field: {$field}"], 400);
+                return;
             }
-            
-            Response::json([
-                'success' => true,
-                'message' => 'Booking created successfully',
-                'booking' => $booking
-            ], 201);
-        } else {
+        }
+        
+        // Add provider ID from auth
+        $data['provider_id'] = $this->userId;
+        
+        // Get the slot to verify it exists and is available
+        $slot = $this->availabilityModel->getSlot($data['slot_id'], $this->userId);
+        
+        if (!$slot) {
+            Response::json(['error' => 'Slot not found'], 404);
+            return;
+        }
+        
+        if (isset($slot['is_available']) && $slot['is_available'] === false) {
+            Response::json(['error' => 'This slot is no longer available'], 409);
+            return;
+        }
+        
+        // Add times from slot
+        $data['start_time'] = $slot['start_time'];
+        $data['end_time'] = $slot['end_time'];
+        
+        // Create booking
+        $booking = $this->bookingModel->create($data);
+        
+        if (!$booking) {
             Response::json(['error' => 'Failed to create booking'], 500);
+            return;
+        }
+        
+        // Generate meeting links if applicable
+        $this->generateMeetingLinks($booking['id']);
+        
+        Response::json([
+            'success' => true,
+            'message' => 'Booking created successfully',
+            'booking' => $booking
+        ], 201);
+    }
+    
+    /**
+     * Generate meeting links for a booking
+     * 
+     * @param string $bookingId Booking ID
+     */
+    private function generateMeetingLinks($bookingId) {
+        try {
+            $digitalSambaController = new \App\Controllers\DigitalSambaController();
+            $digitalSambaController->generateMeetingLinks($bookingId);
+        } catch (\Exception $e) {
+            error_log("Failed to generate meeting links: " . $e->getMessage());
+            // Continue without links - non-critical failure
         }
     }
     
@@ -83,13 +102,9 @@ class BookingController extends BaseController {
      * Get list of bookings
      */
     public function index() {
-        // Authenticate user
-        if (!$this->authenticate()) {
-            Response::json(['error' => 'Authentication required'], 401);
+        if (!$this->requireAuth()) {
             return;
         }
-        
-        error_log("Authenticated user ID: " . $this->userId);
         
         // Get query parameters
         $startDate = $_GET['start_date'] ?? null;
@@ -102,54 +117,37 @@ class BookingController extends BaseController {
         $filter = ['provider_id' => $this->userId];
         
         if ($startDate || $endDate) {
-            $filter['date_range'] = [];
-            
-            if ($startDate) {
-                $filter['date_range']['start'] = $startDate;
-            }
-            
-            if ($endDate) {
-                $filter['date_range']['end'] = $endDate;
-            }
+            $filter['date_range'] = [
+                'start' => $startDate ?? null,
+                'end' => $endDate ?? null
+            ];
         }
         
         if ($status) {
             $filter['status'] = $status;
         }
         
-        error_log("Fetching bookings with filter: " . json_encode($filter));
-        
         try {
             // Get bookings
             $result = $this->bookingModel->getBookings($filter, $page, $limit);
-            
-            // Add debugging info
-            error_log("Retrieved " . count($result['items']) . " bookings");
-            
-            // Return response - pass the entire result with items and pagination
             Response::json($result);
         } catch (\Exception $e) {
             error_log("Error retrieving bookings: " . $e->getMessage());
-            Response::json([
-                'error' => 'Failed to retrieve bookings',
-                'details' => DEBUG ? $e->getMessage() : null
-            ], 500);
+            Response::json(['error' => 'Failed to retrieve bookings'], 500);
         }
     }
     
     /**
      * Get a specific booking by ID
-     * Requires authentication
      */
-    public function view() {
-        // Authenticate user
-        if (!$this->authenticate()) {
-            Response::json(['error' => 'Authentication required'], 401);
+    public function view($id = null) {
+        if (!$this->requireAuth()) {
             return;
         }
         
-        // Get booking ID from URL
-        $id = $this->getIdParam();
+        // Get booking ID from URL if not provided
+        $id = $id ?? $this->getIdFromPath();
+        
         if (!$id) {
             Response::json(['error' => 'Booking ID is required'], 400);
             return;
@@ -158,35 +156,31 @@ class BookingController extends BaseController {
         // Get booking
         $booking = $this->bookingModel->getById($id);
         
-        // Check if booking exists
         if (!$booking) {
             Response::json(['error' => 'Booking not found'], 404);
             return;
         }
         
-        // Check if booking belongs to this provider
+        // Check permissions
         if ($booking['provider_id'] !== $this->userId && $this->userRole !== 'admin') {
             Response::json(['error' => 'You do not have permission to view this booking'], 403);
             return;
         }
         
-        // Return booking
         Response::json($booking);
     }
     
     /**
      * Cancel a booking
-     * Requires authentication
      */
-    public function cancel() {
-        // Authenticate user
-        if (!$this->authenticate()) {
-            Response::json(['error' => 'Authentication required'], 401);
+    public function cancel($id = null) {
+        if (!$this->requireAuth()) {
             return;
         }
         
-        // Get booking ID from URL
-        $id = $this->getIdParam();
+        // Get booking ID from URL if not provided
+        $id = $id ?? $this->getIdFromPath();
+        
         if (!$id) {
             Response::json(['error' => 'Booking ID is required'], 400);
             return;
@@ -195,28 +189,33 @@ class BookingController extends BaseController {
         // Get booking
         $booking = $this->bookingModel->getById($id);
         
-        // Check if booking exists
         if (!$booking) {
             Response::json(['error' => 'Booking not found'], 404);
             return;
         }
         
-        // Check if booking belongs to this provider
+        // Check permissions
         if ($booking['provider_id'] !== $this->userId && $this->userRole !== 'admin') {
             Response::json(['error' => 'You do not have permission to cancel this booking'], 403);
             return;
         }
         
-        // Check if booking is already cancelled
+        // Check if already cancelled
         if ($booking['status'] === 'cancelled') {
             Response::json(['error' => 'Booking is already cancelled'], 400);
             return;
         }
         
         // Cancel booking
-        $success = $this->bookingModel->cancelBooking($id);
+        $success = $this->bookingModel->update($id, ['status' => 'cancelled']);
         
         if ($success) {
+            // Make the slot available again if needed
+            if (!empty($booking['slot_id'])) {
+                $this->availabilityModel->updateSlot($booking['slot_id'], 
+                    ['is_available' => true], $booking['provider_id']);
+            }
+            
             Response::json([
                 'success' => true,
                 'message' => 'Booking cancelled successfully'
@@ -227,109 +226,26 @@ class BookingController extends BaseController {
     }
     
     /**
-     * Handle details action for URL pattern: /booking/{id}
+     * Route booking detail requests
      */
     public function details() {
-        // If request method is PUT, treat as an update/cancel request
-        if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
-            // Check if this is a cancel request
-            $pathParts = explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
-            $lastPart = end($pathParts);
-            
-            if ($lastPart === 'cancel') {
-                $this->cancel();
-                return;
-            }
-            
-            // Other update methods could go here
-            Response::json(['error' => 'Method not allowed'], 405);
-            return;
-        }
-        
-        // Default to view action
-        $this->view();
-    }
-    
-    /**
-     * Authenticate the current user and set user properties
-     * 
-     * @return bool True if authenticated, false otherwise
-     */
-    protected function authenticate(): bool {
-        // Use the getUserId method from BaseController
-        $userId = parent::getUserId();
-        
-        if (!$userId) {
-            return false;
-        }
-        
-        // Get the token to extract additional info
-        $token = $this->getBearerToken();
-        
-        if (!$token) {
-            return false;
-        }
-        
-        try {
-            $secret = defined('JWT_SECRET') ? JWT_SECRET : 'default_secret_change_this';
-            $decoded = \Firebase\JWT\JWT::decode($token, new \Firebase\JWT\Key($secret, 'HS256'));
-            
-            // Store user information from token
-            $this->userId = $userId;
-            $this->userRole = $decoded->data->role ?? 'user';
-            
-            return true;
-        } catch (\Exception $e) {
-            error_log("Token validation error: " . $e->getMessage());
-            return false;
-        }
-    }
-    
-    /**
-     * Get ID parameter from URL
-     * 
-     * @return string|null ID or null if not found
-     */
-    private function getIdParam() {
         $pathParts = explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
         
-        // For URLs like /booking/{id}
+        // Check if path pattern is /booking/{id}/...
         if (count($pathParts) >= 2) {
-            return $pathParts[1];
+            $id = $pathParts[1];
+            
+            // Check for specific action
+            $action = $pathParts[2] ?? '';
+            
+            if ($action === 'cancel' && $_SERVER['REQUEST_METHOD'] === 'PUT') {
+                return $this->cancel($id);
+            }
+            
+            // Default to view
+            return $this->view($id);
         }
         
-        return null;
-    }
-
-    /**
-     * Get user ID from authentication token
-     * 
-     * @return string|null User ID if authenticated, null otherwise
-     */
-    protected function getUserId(): ?string {
-        // Get token from header
-        $token = \App\Utils\JwtAuth::getTokenFromHeader();
-        
-        if (!$token) {
-            return null;
-        }
-        
-        // Validate token
-        $tokenData = \App\Utils\JwtAuth::validateToken($token);
-        
-        if (!$tokenData || empty($tokenData->data->user_id)) {
-            return null;
-        }
-        
-        return $tokenData->data->user_id;
-    }
-    
-    /**
-     * Get JSON data from request
-     * 
-     * @return array JSON data
-     */
-    protected function getJsonData(): array {
-        return parent::getJsonData();
+        Response::json(['error' => 'Invalid URL pattern'], 404);
     }
 }

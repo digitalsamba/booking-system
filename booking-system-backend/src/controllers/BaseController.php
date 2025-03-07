@@ -13,6 +13,10 @@ use Firebase\JWT\Key;
 use Exception;
 
 abstract class BaseController {
+    // Add these properties
+    protected $userId = null;
+    protected $userRole = null;
+    
     /**
      * Get JSON data from request body
      *
@@ -37,18 +41,28 @@ abstract class BaseController {
     }
     
     /**
-     * Ensure user is authenticated
-     * 
-     * @return void
-     * @throws Exception if user is not authenticated
+     * Require authentication for an endpoint
+     * Sets userId and userRole if authenticated
+     *
+     * @return bool True if authenticated
      */
-    protected function requireAuth(): void {
-        $userId = $this->getUserId();
-        
-        if (!$userId) {
+    protected function requireAuth(): bool {
+        $this->userId = $this->getUserId();
+        if (!$this->userId) {
             Response::json(['error' => 'Authentication required'], 401);
-            exit;
+            return false;
         }
+        
+        // Get role from token
+        $token = $this->getBearerToken();
+        if ($token) {
+            $decoded = \App\Utils\JwtAuth::validateToken($token);
+            if ($decoded) {
+                $this->userRole = $decoded->data->role ?? 'user';
+            }
+        }
+        
+        return true;
     }
     
     /**
@@ -106,5 +120,43 @@ abstract class BaseController {
     protected function getBearerToken(): ?string {
         // Use the JwtAuth utility method
         return \App\Utils\JwtAuth::getTokenFromHeader();
+    }
+    
+    /**
+     * Validate date format
+     * 
+     * @param string $date Date string in YYYY-MM-DD format
+     * @return bool True if valid
+     */
+    protected function validateDateFormat($date): bool {
+        if (!is_string($date)) {
+            return false;
+        }
+        $d = \DateTime::createFromFormat('Y-m-d', $date);
+        return $d && $d->format('Y-m-d') === $date;
+    }
+    
+    /**
+     * Validate time format
+     * 
+     * @param string $time Time string in HH:MM format
+     * @return bool True if valid
+     */
+    protected function validateTimeFormat($time): bool {
+        if (!is_string($time)) {
+            return false;
+        }
+        $t = \DateTime::createFromFormat('H:i', $time);
+        return $t && $t->format('H:i') === $time;
+    }
+    
+    /**
+     * Get ID from URL path
+     *
+     * @return string|null
+     */
+    protected function getIdFromPath(): ?string {
+        $pathParts = explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
+        return $pathParts[1] ?? null;
     }
 }

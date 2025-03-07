@@ -161,28 +161,4 @@ class AuthController extends BaseController {
             ]
         ]);
     }
-    
-    /**
-     * Generate JWT token
-     */
-    private function generateJwt($user) {
-        $issuedAt = time();
-        $expiration = $issuedAt + (defined('JWT_EXPIRY') ? JWT_EXPIRY : 3600);
-        
-        $payload = [
-            'iat' => $issuedAt,
-            'exp' => $expiration,
-            'data' => [
-                'id' => isset($user['_id']) ? (string)$user['_id'] : '',
-                'username' => $user['username'],
-                'role' => $user['role'] ?? 'user'
-            ]
-        ];
-        
-        return \Firebase\JWT\JWT::encode(
-            $payload, 
-            defined('JWT_SECRET') ? JWT_SECRET : 'default_secret_change_this',
-            'HS256'
-        );
-    }
 }
