@@ -49,8 +49,10 @@ Start the development server:
 
 ```
 cd booking-system-backend
-php -S localhost:8000 router.php
+php -S 0.0.0.0:8000 router.php
 ```
+
+Note: Using `0.0.0.0` instead of `localhost` allows access from other devices on the network or from within a virtual machine.
 
 ## Testing
 
@@ -60,6 +62,9 @@ The application provides several testing utilities:
 - Check single file syntax: `php -l booking-system-backend/path/to/file.php`
 - API test: `php booking-system-backend/api_test.php`
 - MongoDB test: `php booking-system-backend/mongodb_integration_test.php`
+- Booking customer test: `php booking-system-backend/test_booking_customer.php`
+- Simple test interface: Open `/public/test-provider-api-simple.html` in a browser
+- Full booking test interface: Open `/public/test-provider-booking.html` in a browser
 
 ## Architecture
 
@@ -79,12 +84,34 @@ The API uses JWT token authentication:
 3. Client includes token in Authorization header for subsequent requests
 4. Server validates token and authorizes user
 
+## Data Model
+
+### User
+- **username**: String - Unique username for login
+- **email**: String - User's email address
+- **password**: String - Hashed password
+- **display_name**: String - Name displayed to others (e.g., in meeting links)
+- **role**: String - User role (user, admin)
+
+### Booking
+- **provider_id**: ObjectId - ID of the service provider
+- **slot_id**: ObjectId - ID of the availability slot
+- **customer**: Object - Contains customer details (name, email, phone)
+- **start_time**: DateTime - Booking start time
+- **end_time**: DateTime - Booking end time
+- **status**: String - Booking status (confirmed, completed, cancelled)
+- **notes**: String - Optional booking notes
+- **provider_link**: String - Digital Samba meeting link for provider
+- **customer_link**: String - Digital Samba meeting link for customer
+
 ## API Endpoints
 
 ### Authentication Endpoints
 
 - `POST /auth/register` - Register a new user
 - `POST /auth/login` - Authenticate and get JWT token
+- `GET /auth/profile` - Get user profile information
+- `POST /auth/profile` - Update user profile information
 
 ### Booking Endpoints
 
@@ -98,6 +125,8 @@ The API uses JWT token authentication:
 
 - `POST /meetings/create` - Create a new virtual meeting
 - `GET /meetings/:id` - Get meeting details
+- `GET /booking/:id/meeting-links` - Get meeting links for a booking
+- `POST /booking/:id/meeting-links` - Generate meeting links for a booking
 
 ### Availability Endpoints
 
