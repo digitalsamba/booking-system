@@ -107,6 +107,11 @@ class UserModel extends BaseModel {
                 'updated_at' => date('Y-m-d H:i:s')
             ];
             
+            // Add display name if provided
+            if (!empty($userData['display_name'])) {
+                $newUser['display_name'] = $userData['display_name'];
+            }
+            
             // Add Digital Samba credentials if provided
             if (!empty($userData['developer_key'])) {
                 $newUser['developer_key'] = $userData['developer_key'];
@@ -216,6 +221,50 @@ class UserModel extends BaseModel {
         return $this->update($id, ['password' => $hashedPassword]);
     }
     
+    /**
+     * Update user profile
+     * 
+     * @param string $id User ID
+     * @param array $data Profile data to update
+     * @return bool Success flag
+     */
+    public function updateProfile(string $id, array $data) {
+        try {
+            // Prepare update data - only allow specific fields to be updated
+            $allowedFields = [
+                'display_name',
+                'email',
+                'profile',
+                'preferences'
+            ];
+            
+            $updateData = [];
+            foreach ($allowedFields as $field) {
+                if (isset($data[$field])) {
+                    $updateData[$field] = $data[$field];
+                }
+            }
+            
+            // If no valid fields to update
+            if (empty($updateData)) {
+                return false;
+            }
+            
+            // Add update timestamp
+            $updateData['updated_at'] = new UTCDateTime(time() * 1000);
+            
+            $result = $this->collection->updateOne(
+                ['_id' => new ObjectId($id)],
+                ['$set' => $updateData]
+            );
+            
+            return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
+        } catch (\Exception $e) {
+            error_log("Error updating user profile: " . $e->getMessage());
+            return false;
+        }
+    }
+
     /**
      * Convert MongoDB document to array
      * 

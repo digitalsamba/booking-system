@@ -150,6 +150,91 @@ class AuthController extends BaseController {
     }
     
     /**
+     * Get the current user's profile
+     */
+    public function getProfile() {
+        // Check for JWT token authentication
+        $userId = $this->getUserId();
+        
+        if (!$userId) {
+            Response::json(['error' => 'Authentication required'], 401);
+            return;
+        }
+        
+        try {
+            // Get user from database
+            $user = $this->userModel->findById($userId);
+            
+            if (!$user) {
+                Response::json(['error' => 'User not found'], 404);
+                return;
+            }
+            
+            // Return user profile data (excluding sensitive fields)
+            Response::json([
+                'id' => isset($user['_id']) ? (string)$user['_id'] : '',
+                'username' => $user['username'],
+                'email' => $user['email'],
+                'role' => $user['role'] ?? 'user',
+                'display_name' => $user['display_name'] ?? $user['username'],
+                'profile' => $user['profile'] ?? [],
+                'created_at' => $user['created_at'] ?? null
+            ]);
+            
+        } catch (\Exception $e) {
+            error_log("Profile error: " . $e->getMessage());
+            Response::json(['error' => 'Server error retrieving profile: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * Update the current user's profile
+     */
+    public function updateProfile() {
+        // Check for JWT token authentication
+        $userId = $this->getUserId();
+        
+        if (!$userId) {
+            Response::json(['error' => 'Authentication required'], 401);
+            return;
+        }
+        
+        // Get JSON input data
+        $data = $this->getJsonData();
+        
+        try {
+            // Update user in database
+            $updated = $this->userModel->updateProfile($userId, $data);
+            
+            if (!$updated) {
+                Response::json(['error' => 'Failed to update profile'], 400);
+                return;
+            }
+            
+            // Get updated user data
+            $user = $this->userModel->findById($userId);
+            
+            // Return updated profile
+            Response::json([
+                'message' => 'Profile updated successfully',
+                'user' => [
+                    'id' => isset($user['_id']) ? (string)$user['_id'] : '',
+                    'username' => $user['username'],
+                    'email' => $user['email'],
+                    'role' => $user['role'] ?? 'user',
+                    'display_name' => $user['display_name'] ?? $user['username'],
+                    'profile' => $user['profile'] ?? [],
+                    'updated_at' => time()
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            error_log("Profile update error: " . $e->getMessage());
+            Response::json(['error' => 'Server error updating profile: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Generate JWT token
      */
     private function generateJwt($user) {

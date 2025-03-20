@@ -640,7 +640,7 @@
             // Handle response
             if (result.ok) {
                 // Display profile data
-                document.getElementById('profile-display-name').value = result.data.user.display_name || '';
+                document.getElementById('profile-display-name').value = result.data.display_name || '';
                 document.getElementById('profileResult').innerHTML = 
                     '<p class="success">Profile loaded successfully</p>';
             } else {
@@ -678,7 +678,9 @@
             // Handle response
             if (result.ok) {
                 // Update stored user data
-                authData.user = result.data.user;
+                if (result.data.user) {
+                    authData.user = result.data.user;
+                }
                 
                 document.getElementById('profileResult').innerHTML = 
                     '<p class="success">Profile updated successfully</p>';
