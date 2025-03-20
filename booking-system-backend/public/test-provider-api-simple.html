@@ -232,6 +232,9 @@
             user: null
         };
         
+        // Use current location for API URL (works with port forwarding, different ports, etc.)
+        const API_URL = `${window.location.protocol}//${window.location.host}`;
+        
         // Helper function to make API requests
         async function apiRequest(endpoint, method = 'GET', data = null) {
             try {
@@ -255,7 +258,7 @@
                 }
                 
                 // Make the API request
-                const response = await fetch(endpoint, options);
+                const response = await fetch(`${API_URL}/${endpoint}`, options);
                 
                 // Parse the JSON response
                 let responseData;

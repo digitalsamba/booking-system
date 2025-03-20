@@ -244,8 +244,8 @@
     </div>
     
     <script>
-        // API Base URL - Change this to match your API
-        const API_URL = 'http://localhost:8000';
+        // Use current location for API URL (works with port forwarding, different ports, etc.)
+        const API_URL = `${window.location.protocol}//${window.location.host}`;
         
         // Selected slot info
         let selectedSlot = null;
