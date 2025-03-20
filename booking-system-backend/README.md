@@ -8,6 +8,9 @@ This backend API provides a complete solution for managing bookings, users, avai
 
 - [Installation](#installation)
 - [Configuration](#configuration)
+- [Development](#development)
+- [Testing](#testing)
+- [Architecture](#architecture)
 - [Authentication](#authentication)
 - [API Endpoints](#api-endpoints)
   - [Authentication Endpoints](#authentication-endpoints)
@@ -16,9 +19,138 @@ This backend API provides a complete solution for managing bookings, users, avai
   - [Availability Endpoints](#availability-endpoints)
   - [Service Endpoints](#service-endpoints)
   - [User Endpoints](#user-endpoints)
+- [Code Style Guidelines](#code-style-guidelines)
 - [Error Handling](#error-handling)
 
 ## Installation
 
 1. Clone the repository
 2. Install dependencies:
+   ```
+   cd booking-system-backend
+   composer install
+   ```
+3. Configure MongoDB connection in `config/database.php`
+4. Set up JWT secret key in `config/auth.php`
+5. Configure Digital Samba API keys in `config/digitalsamba.php`
+
+## Configuration
+
+The application uses configuration files located in the `config/` directory:
+
+- `database.php` - MongoDB connection settings
+- `auth.php` - JWT token settings
+- `digitalsamba.php` - Digital Samba integration settings
+- `cors.php` - CORS policy configuration
+
+## Development
+
+Start the development server:
+
+```
+cd booking-system-backend
+php -S localhost:8000 router.php
+```
+
+## Testing
+
+The application provides several testing utilities:
+
+- Syntax check: `php booking-system-backend/syntax_check.php`
+- Check single file syntax: `php -l booking-system-backend/path/to/file.php`
+- API test: `php booking-system-backend/api_test.php`
+- MongoDB test: `php booking-system-backend/mongodb_integration_test.php`
+
+## Architecture
+
+The application follows an MVC architecture:
+
+- **Controllers**: Handle API requests and responses
+- **Models**: Interact with MongoDB database
+- **Utils**: Provide common functionality (Response, JwtAuth, etc.)
+- **Router**: Routes API requests to appropriate controllers
+
+## Authentication
+
+The API uses JWT token authentication:
+
+1. User logs in with email/password
+2. Server validates credentials and returns JWT token
+3. Client includes token in Authorization header for subsequent requests
+4. Server validates token and authorizes user
+
+## API Endpoints
+
+### Authentication Endpoints
+
+- `POST /auth/register` - Register a new user
+- `POST /auth/login` - Authenticate and get JWT token
+
+### Booking Endpoints
+
+- `GET /bookings` - List all bookings
+- `GET /bookings/:id` - Get booking details
+- `POST /bookings` - Create a new booking
+- `PUT /bookings/:id` - Update a booking
+- `DELETE /bookings/:id` - Cancel a booking
+
+### Digital Samba Integration
+
+- `POST /meetings/create` - Create a new virtual meeting
+- `GET /meetings/:id` - Get meeting details
+
+### Availability Endpoints
+
+- `GET /availability` - List available time slots
+- `POST /availability` - Create availability slots
+- `PUT /availability/:id` - Update availability
+- `DELETE /availability/:id` - Remove availability
+
+### Service Endpoints
+
+- `GET /services` - List all services
+- `GET /services/:id` - Get service details
+- `POST /services` - Create a new service
+- `PUT /services/:id` - Update a service
+- `DELETE /services/:id` - Delete a service
+
+### User Endpoints
+
+- `GET /users` - List all users (admin only)
+- `GET /users/:id` - Get user details
+- `PUT /users/:id` - Update user profile
+- `DELETE /users/:id` - Delete user (admin only)
+
+## Code Style Guidelines
+
+- **Namespaces**: Use `App\` namespace with proper PSR-4 autoloading
+- **Error Handling**: Use try/catch with error logging; return JSON errors with proper HTTP status codes
+- **Database**: Use MongoDB through models; format ObjectIds and UTCDates consistently 
+- **Documentation**: Use PHPDoc for classes and methods
+- **Naming**: PascalCase for classes, camelCase for methods/variables
+- **Authentication**: JWT token authentication through Authorization header
+- **Response Format**: Use Response utility class for consistent JSON responses
+- **Controllers**: Extend BaseController; use getJsonData() to parse requests 
+- **Models**: Extend BaseModel; use formatDocument() to normalize responses
+
+## Error Handling
+
+The API returns consistent error responses in the following format:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable error message",
+    "details": {}
+  }
+}
+```
+
+Common error codes:
+- `VALIDATION_ERROR` - Invalid input data
+- `NOT_FOUND` - Resource not found
+- `UNAUTHORIZED` - Authentication required
+- `FORBIDDEN` - Insufficient permissions
+- `INTERNAL_ERROR` - Server error
