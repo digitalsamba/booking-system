@@ -429,10 +429,92 @@ class BookingModel extends BaseModel {
         $result = [
             'id' => (string)($booking['_id'] ?? ''),
             'provider_id' => (string)($booking['provider_id'] ?? ''),
-            'customer' => $booking['customer'] ?? [],
             'notes' => $booking['notes'] ?? '',
             'status' => $booking['status'] ?? 'confirmed',
         ];
+        
+        // Process customer data
+        if (isset($booking['customer'])) {
+            $customerData = $booking['customer'];
+            
+            // Convert object to array if needed
+            if (is_object($customerData)) {
+                $customerData = (array)$customerData;
+                error_log("Converted customer object to array");
+            }
+            
+            if (is_array($customerData)) {
+                // We have an array now, whether it was originally or after conversion
+                $result['customer'] = $customerData;
+                
+                // Log customer data for debugging
+                error_log("Customer data found in booking: " . json_encode($customerData));
+                
+                // Ensure the customer data has necessary fields
+                if (empty($result['customer']['name'])) {
+                    // Try to find a name in other possible fields
+                    if (!empty($booking['customer_name'])) {
+                        $result['customer']['name'] = $booking['customer_name'];
+                        error_log("Using customer_name from booking: " . $booking['customer_name']);
+                    } else {
+                        error_log("Customer name is missing in booking data");
+                        $result['customer']['name'] = 'N/A';
+                    }
+                }
+                
+                if (empty($result['customer']['email'])) {
+                    // Try to find email in other possible fields
+                    if (!empty($booking['customer_email'])) {
+                        $result['customer']['email'] = $booking['customer_email'];
+                        error_log("Using customer_email from booking: " . $booking['customer_email']);
+                    } else {
+                        error_log("Customer email is missing in booking data");
+                        $result['customer']['email'] = 'N/A';
+                    }
+                }
+                
+                if (empty($result['customer']['phone'])) {
+                    // Try to find phone in other possible fields
+                    if (!empty($booking['customer_phone'])) {
+                        $result['customer']['phone'] = $booking['customer_phone'];
+                        error_log("Using customer_phone from booking: " . $booking['customer_phone']);
+                    } else {
+                        error_log("Customer phone is missing in booking data");
+                        $result['customer']['phone'] = 'N/A';
+                    }
+                }
+            } else {
+                error_log("Customer field is not an array or object: " . gettype($booking['customer']));
+                // If it's a string, try to use it as a name
+                if (is_string($booking['customer'])) {
+                    $result['customer'] = [
+                        'name' => $booking['customer'],
+                        'email' => 'N/A',
+                        'phone' => 'N/A'
+                    ];
+                    error_log("Using customer string as name: " . $booking['customer']);
+                } else {
+                    $result['customer'] = [
+                        'name' => 'N/A',
+                        'email' => 'N/A',
+                        'phone' => 'N/A'
+                    ];
+                }
+            }
+        } else {
+            // Check for flat customer fields
+            $name = $booking['customer_name'] ?? 'N/A';
+            $email = $booking['customer_email'] ?? 'N/A';
+            $phone = $booking['customer_phone'] ?? 'N/A';
+            
+            error_log("No customer object found, using flat fields: name={$name}, email={$email}");
+            
+            $result['customer'] = [
+                'name' => $name,
+                'email' => $email,
+                'phone' => $phone
+            ];
+        }
         
         // Add slot_id if exists
         if (isset($booking['slot_id'])) {

@@ -8,6 +8,19 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+// Handle OPTIONS preflight request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    // Set CORS headers
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+    header('Access-Control-Max-Age: 86400');  // 24 hours
+    
+    // Return 200 OK with no content
+    http_response_code(200);
+    exit;
+}
+
 // IMPORTANT: Load Composer autoloader at the very beginning
 $autoloadPath = __DIR__ . '/vendor/autoload.php';
 if (file_exists($autoloadPath)) {
@@ -84,6 +97,19 @@ if ($uri === 'ping' || $uri === 'test') {
     exit;
 }
 
+// Public API endpoints
+if (preg_match('#^public/availability$#', $uri)) {
+    $controller = new \App\Controllers\PublicController();
+    $controller->availability();
+    exit;
+}
+
+if (preg_match('#^public/booking$#', $uri)) {
+    $controller = new \App\Controllers\PublicController();
+    $controller->booking();
+    exit;
+}
+
 // Booking routes - public endpoints
 if (preg_match('#^booking/create$#', $uri)) {
     $controller = new \App\Controllers\BookingController();
@@ -129,6 +155,17 @@ if (preg_match('#^auth/register$#', $uri)) {
 if (preg_match('#^auth/new-token$#', $uri)) {
     $controller = new \App\Controllers\AuthController();
     $controller->newToken();
+    exit;
+}
+
+// Profile management
+if (preg_match('#^auth/profile$#', $uri)) {
+    $controller = new \App\Controllers\AuthController();
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        $controller->getProfile();
+    } else if ($_SERVER['REQUEST_METHOD'] === 'PUT' || $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $controller->updateProfile();
+    }
     exit;
 }
 

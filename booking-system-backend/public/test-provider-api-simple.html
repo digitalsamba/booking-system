@@ -127,6 +127,10 @@
                 <input type="password" id="confirmPassword" required>
             </div>
             <div>
+                <label for="displayName">Display Name:</label>
+                <input type="text" id="displayName" placeholder="Your name as shown to others (optional)">
+            </div>
+            <div>
                 <label for="developerKey">Digital Samba Developer Key:</label>
                 <input type="text" id="developerKey" placeholder="Enter your Digital Samba developer key">
             </div>
@@ -155,6 +159,22 @@
         <div id="loginResult"></div>
     </div>
     
+    <!-- Profile Section -->
+    <div id="profile-section" class="hidden">
+        <div class="card">
+            <h2>Manage Profile</h2>
+            <form id="profileForm">
+                <div>
+                    <label for="profile-display-name">Display Name:</label>
+                    <input type="text" id="profile-display-name" placeholder="Your name as shown to others">
+                </div>
+                <button type="button" onclick="updateProfile()">Update Profile</button>
+                <button type="button" onclick="viewProfile()">View Profile</button>
+            </form>
+            <div id="profileResult"></div>
+        </div>
+    </div>
+
     <!-- New Availability Sections -->
     <div id="availability-section" class="hidden">
         <div class="card">
@@ -258,7 +278,10 @@
                 }
                 
                 // Make the API request
-                const response = await fetch(`${API_URL}/${endpoint}`, options);
+                // Normalize URL to avoid double slashes
+                const url = endpoint.startsWith('/') ? `${API_URL}${endpoint}` : `${API_URL}/${endpoint}`;
+                console.log(`Making API request to: ${url}`);
+                const response = await fetch(url, options);
                 
                 // Parse the JSON response
                 let responseData;
@@ -297,6 +320,7 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
+            const displayName = document.getElementById('displayName').value;
             const developerKey = document.getElementById('developerKey').value;
             const teamId = document.getElementById('teamId').value;
             
@@ -321,6 +345,10 @@
             };
             
             // Add optional fields if provided
+            if (displayName) {
+                registrationData.display_name = displayName;
+            }
+            
             if (developerKey) {
                 registrationData.developer_key = developerKey;
             }
@@ -378,8 +406,12 @@
                 document.getElementById('loginResult').innerHTML = 
                     `<p class="success">Login successful! Welcome, ${result.data.user.username}</p>`;
                 
-                // Show availability section
+                // Show availability and profile sections
                 document.getElementById('availability-section').classList.remove('hidden');
+                document.getElementById('profile-section').classList.remove('hidden');
+                
+                // Load profile data
+                viewProfile();
                 
                 // Log token info (for testing)
                 console.log("Token received:", authData.token.substring(0, 20) + "...");
@@ -591,6 +623,69 @@
             nextWeek.setDate(nextWeek.getDate() + 7);
             const nextWeekFormatted = nextWeek.toISOString().split('T')[0];
             document.getElementById('gen-end-date').value = nextWeekFormatted;
+        }
+        
+        // View user profile
+        async function viewProfile() {
+            // Check if user is logged in
+            if (!authData.token) {
+                document.getElementById('profileResult').innerHTML = 
+                    '<p class="error">You must be logged in to view your profile</p>';
+                return;
+            }
+            
+            // Make API request
+            const result = await apiRequest('auth/profile');
+            
+            // Handle response
+            if (result.ok) {
+                // Display profile data
+                document.getElementById('profile-display-name').value = result.data.user.display_name || '';
+                document.getElementById('profileResult').innerHTML = 
+                    '<p class="success">Profile loaded successfully</p>';
+            } else {
+                document.getElementById('profileResult').innerHTML = 
+                    `<p class="error">Failed to load profile: ${result.data.error || 'Unknown error'}</p>`;
+            }
+        }
+        
+        // Update user profile
+        async function updateProfile() {
+            // Check if user is logged in
+            if (!authData.token) {
+                document.getElementById('profileResult').innerHTML = 
+                    '<p class="error">You must be logged in to update your profile</p>';
+                return;
+            }
+            
+            // Get display name value
+            const displayName = document.getElementById('profile-display-name').value;
+            
+            if (!displayName) {
+                document.getElementById('profileResult').innerHTML = 
+                    '<p class="error">Display name cannot be empty</p>';
+                return;
+            }
+            
+            // Update data
+            const updateData = {
+                display_name: displayName
+            };
+            
+            // Make API request
+            const result = await apiRequest('auth/profile', 'POST', updateData);
+            
+            // Handle response
+            if (result.ok) {
+                // Update stored user data
+                authData.user = result.data.user;
+                
+                document.getElementById('profileResult').innerHTML = 
+                    '<p class="success">Profile updated successfully</p>';
+            } else {
+                document.getElementById('profileResult').innerHTML = 
+                    `<p class="error">Failed to update profile: ${result.data.error || 'Unknown error'}</p>`;
+            }
         }
         
         // Initialize the page

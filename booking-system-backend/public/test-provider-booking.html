@@ -280,8 +280,11 @@
                 }
                 
                 // Make the request
-                console.log(`Making ${method} request to: ${endpoint}`);
-                const response = await fetch(endpoint, options);
+                // Use current location hostname and protocol
+                const baseUrl = `${window.location.protocol}//${window.location.host}`;
+                const fullUrl = endpoint.startsWith('http') ? endpoint : `${baseUrl}/${endpoint}`;
+                console.log(`Making ${method} request to: ${fullUrl}`);
+                const response = await fetch(fullUrl, options);
                 
                 // Try to parse JSON response
                 let responseData;
@@ -364,6 +367,7 @@
                 return;
             }
             
+            // Ensure we're using a relative URL that will work with our baseUrl logic
             const result = await apiRequest('auth/login', 'POST', { username, password });
             
             if (result.ok && result.data.token) {

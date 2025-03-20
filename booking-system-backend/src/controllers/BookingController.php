@@ -53,9 +53,11 @@ class BookingController extends BaseController {
         }
         
         // After creating the booking successfully:
+        $bookingId = isset($result['_id']) ? (string)$result['_id'] : null;
+        
         if ($bookingId) {
             // Get the created booking
-            $booking = $this->getById($bookingId);
+            $booking = $this->bookingModel->getById($bookingId);
             
             // Generate meeting links
             try {
@@ -63,7 +65,7 @@ class BookingController extends BaseController {
                 $digitalSambaController->generateMeetingLinks($bookingId);
                 
                 // Refresh booking data to include links
-                $booking = $this->getById($bookingId);
+                $booking = $this->bookingModel->getById($bookingId);
             } catch (\Exception $e) {
                 error_log("Failed to generate meeting links: " . $e->getMessage());
                 // Continue without links
