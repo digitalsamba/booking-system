@@ -9,6 +9,7 @@ This is the frontend application for the Booking System, built with Vue.js and P
 - Booking creation and management
 - Service provider availability management
 - Integration with Digital Samba for video conferencing
+- .
 
 ## Project Setup
 
