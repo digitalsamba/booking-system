@@ -14,9 +14,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3002,  // Match your current working port
-    host: '0.0.0.0',
-    strictPort: true,
+    port: 3002,
+    host: 'localhost',
     cors: true,
     proxy: {
       '/api': {
@@ -28,8 +27,16 @@ export default defineConfig({
     fs: {
       // Allow serving files from one level up to the project root
       allow: ['..']
-    },
-    // Explicitly tell Vite to serve index.html for SPA routing
-    middlewareMode: 'html'
+    }
+  },
+  optimizeDeps: {
+    exclude: []
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html')
+      }
+    }
   }
 })
