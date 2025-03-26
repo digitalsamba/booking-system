@@ -70,6 +70,7 @@ The application provides several testing utilities:
 - API test: `php booking-system-backend/api_test.php`
 - MongoDB test: `php booking-system-backend/mongodb_integration_test.php`
 - Booking customer test: `php booking-system-backend/test_booking_customer.php`
+- Digital Samba integration test: `php booking-system-backend/ds_test.php`
 - Simple test interface: Open `/public/test-provider-api-simple.html` in a browser
 - Full booking test interface: Open `/public/test-provider-booking.html` in a browser
 
@@ -114,6 +115,8 @@ The API uses JWT token authentication:
 - **password**: String - Hashed password
 - **display_name**: String - Name displayed to others (e.g., in meeting links)
 - **role**: String - User role (user, admin)
+- **developer_key**: String - Digital Samba API developer key
+- **team_id**: String - Digital Samba team identifier
 
 ### Booking
 - **provider_id**: ObjectId - ID of the service provider
@@ -124,7 +127,12 @@ The API uses JWT token authentication:
 - **status**: String - Booking status (confirmed, completed, cancelled)
 - **notes**: String - Optional booking notes
 - **provider_link**: String - Digital Samba meeting link for provider
-- **customer_link**: String - Digital Samba meeting link for customer
+- **ds_room_id**: String - Digital Samba room identifier
+- **customer**: Object
+  - **name**: String - Customer name
+  - **email**: String - Customer email
+  - **phone**: String - Customer phone (optional)
+  - **customer_link**: String - Digital Samba meeting link for customer
 
 ## API Endpoints
 
@@ -149,6 +157,8 @@ The API uses JWT token authentication:
 - `GET /meetings/:id` - Get meeting details
 - `GET /booking/:id/meeting-links` - Get meeting links for a booking
 - `POST /booking/:id/meeting-links` - Generate meeting links for a booking
+
+For detailed documentation on the Digital Samba integration, see [docs/digital-samba-integration.md](docs/digital-samba-integration.md).
 
 ### Availability Endpoints
 
