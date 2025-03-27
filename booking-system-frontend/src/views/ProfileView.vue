@@ -57,26 +57,36 @@
       <h3>Digital Samba Integration</h3>
       <p class="section-description">These settings are required for video meeting functionality</p>
       
-      <div class="form-group">
-        <label for="team_id">Digital Samba Team ID:</label>
-        <input 
-          type="text" 
-          id="team_id" 
-          v-model="formData.team_id" 
-          class="form-control" 
-        />
-        <span class="field-note">Your Digital Samba team identifier</span>
-      </div>
-      
-      <div class="form-group">
-        <label for="developer_key">Developer Key:</label>
-        <input 
-          type="password" 
-          id="developer_key" 
-          v-model="formData.developer_key" 
-          class="form-control" 
-        />
-        <span class="field-note">Your Digital Samba API developer key</span>
+      <div class="ds-section" :class="{ 'highlight-section': missingCredentials }">
+        <div v-if="missingCredentials" class="missing-credentials-alert">
+          <i class="alert-icon">⚠️</i> 
+          These settings are required for video meetings to work
+        </div>
+        
+        <div class="form-group">
+          <label for="team_id">Digital Samba Team ID:</label>
+          <input 
+            type="text" 
+            id="team_id" 
+            v-model="formData.team_id" 
+            class="form-control"
+            :class="{ 'highlight-field': !formData.team_id }"
+            ref="teamIdInput"
+          />
+          <span class="field-note">Your Digital Samba team identifier</span>
+        </div>
+        
+        <div class="form-group">
+          <label for="developer_key">Developer Key:</label>
+          <input 
+            type="password" 
+            id="developer_key" 
+            v-model="formData.developer_key" 
+            class="form-control"
+            :class="{ 'highlight-field': !formData.developer_key }"
+          />
+          <span class="field-note">Your Digital Samba API developer key</span>
+        </div>
       </div>
       
       <div class="form-divider"></div>
@@ -164,6 +174,12 @@ export default {
     const updateSuccess = ref(false)
     const saveSuccess = ref(false)
     const digitalSambaUpdated = ref(false)
+    const teamIdInput = ref(null)
+    
+    // Computed property to determine if Digital Samba credentials are missing
+    const missingCredentials = computed(() => {
+      return !formData.team_id || !formData.developer_key
+    })
     
     const formData = reactive({
       username: '',
@@ -199,6 +215,14 @@ export default {
           formData.developer_key = authStore.user.developer_key || ''
         }
       }
+      
+      // Focus on the team_id input if credentials are missing
+      // Use setTimeout to ensure the ref is mounted
+      setTimeout(() => {
+        if (!formData.team_id && teamIdInput.value) {
+          teamIdInput.value.focus()
+        }
+      }, 200)
     })
     
     const updateProfile = async () => {
@@ -374,6 +398,8 @@ export default {
       updateSuccess,
       saveSuccess,
       digitalSambaUpdated,
+      missingCredentials,
+      teamIdInput,
       updateProfile,
       directSave
     }
@@ -523,5 +549,40 @@ export default {
   border-radius: 4px;
   padding: 1rem;
   margin-top: 1rem;
+}
+
+/* Digital Samba section highlighting */
+.ds-section {
+  padding: 1.5rem;
+  border-radius: 5px;
+  transition: all 0.3s ease;
+}
+
+.highlight-section {
+  background-color: #fff8e1;
+  border: 1px solid #ffecb3;
+  box-shadow: 0 2px 5px rgba(255, 193, 7, 0.2);
+}
+
+.highlight-field {
+  border-color: #ff9800 !important;
+  background-color: #fff8e1 !important;
+  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2) !important;
+}
+
+.missing-credentials-alert {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+  border-left: 4px solid #ffc107;
+  display: flex;
+  align-items: center;
+}
+
+.alert-icon {
+  margin-right: 0.5rem;
+  font-size: 1.25rem;
 }
 </style>
