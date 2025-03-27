@@ -8,11 +8,11 @@
     
     <form @submit.prevent="handleLogin" class="login-form">
       <div class="form-group">
-        <label for="email">Email:</label>
+        <label for="username">Username:</label>
         <input 
-          type="email" 
-          id="email" 
-          v-model="email" 
+          type="text" 
+          id="username" 
+          v-model="username" 
           required 
           class="form-control" 
         />
@@ -53,12 +53,12 @@ export default {
     const router = useRouter()
     const authStore = useAuthStore()
     
-    const email = ref('')
+    const username = ref('')
     const password = ref('')
     
     const handleLogin = async () => {
       const credentials = {
-        email: email.value,
+        username: username.value,
         password: password.value
       }
       
@@ -70,7 +70,7 @@ export default {
     }
     
     return {
-      email,
+      username,
       password,
       authStore,
       handleLogin

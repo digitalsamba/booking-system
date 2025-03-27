@@ -79,6 +79,16 @@
         <p>Already have an account? <router-link to="/login">Login here</router-link></p>
       </div>
     </form>
+    
+    <!-- Success Modal -->
+    <SuccessModal
+      :show="showSuccessModal"
+      title="Registration Successful!"
+      :message="`Welcome ${display_name}! Your account has been created successfully.`"
+      action-text="Go to Login"
+      @close="showSuccessModal = false"
+      @action="goToLogin"
+    />
   </div>
 </template>
 
@@ -86,9 +96,13 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import SuccessModal from '../components/SuccessModal.vue'
 
 export default {
   name: 'RegisterView',
+  components: {
+    SuccessModal
+  },
   setup() {
     const router = useRouter()
     const authStore = useAuthStore()
@@ -98,6 +112,7 @@ export default {
     const display_name = ref('')
     const password = ref('')
     const password_confirm = ref('')
+    const showSuccessModal = ref(false)
     
     const passwordsDoNotMatch = computed(() => {
       return password.value && password_confirm.value && 
@@ -119,8 +134,12 @@ export default {
       const success = await authStore.register(userData)
       
       if (success) {
-        router.push({ name: 'home' })
+        showSuccessModal.value = true
       }
+    }
+    
+    const goToLogin = () => {
+      router.push({ name: 'login' })
     }
     
     return {
@@ -131,7 +150,9 @@ export default {
       password_confirm,
       passwordsDoNotMatch,
       authStore,
-      handleRegister
+      handleRegister,
+      showSuccessModal,
+      goToLogin
     }
   }
 }

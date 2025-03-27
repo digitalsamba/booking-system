@@ -7,6 +7,7 @@ const LoginView = () => import('../views/LoginView.vue')
 const RegisterView = () => import('../views/RegisterView.vue')
 const BookingsView = () => import('../views/BookingsView.vue')
 const ProfileView = () => import('../views/ProfileView.vue')
+// Debug component removed
 
 const routes = [
   {
@@ -39,6 +40,7 @@ const routes = [
     component: ProfileView,
     meta: { requiresAuth: true }
   },
+  // Debug route removed
 ]
 
 const router = createRouter({
