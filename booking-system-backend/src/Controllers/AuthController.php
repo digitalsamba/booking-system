@@ -94,7 +94,10 @@ class AuthController extends BaseController {
                     'id' => isset($user['_id']) ? (string)$user['_id'] : '',
                     'username' => $user['username'],
                     'email' => $user['email'],
-                    'role' => $user['role'] ?? 'user'
+                    'role' => $user['role'] ?? 'user',
+                    'display_name' => $user['display_name'] ?? $user['username'],
+                    'team_id' => $user['team_id'] ?? '',
+                    'developer_key' => $user['developer_key'] ?? ''
                 ]
             ]);
         } catch (\Exception $e) {
@@ -178,6 +181,8 @@ class AuthController extends BaseController {
                 'role' => $user['role'] ?? 'user',
                 'display_name' => $user['display_name'] ?? $user['username'],
                 'profile' => $user['profile'] ?? [],
+                'team_id' => $user['team_id'] ?? '',
+                'developer_key' => $user['developer_key'] ?? '',
                 'created_at' => $user['created_at'] ?? null
             ]);
             
@@ -224,6 +229,8 @@ class AuthController extends BaseController {
                     'role' => $user['role'] ?? 'user',
                     'display_name' => $user['display_name'] ?? $user['username'],
                     'profile' => $user['profile'] ?? [],
+                    'team_id' => $user['team_id'] ?? '',
+                    'developer_key' => $user['developer_key'] ?? '',
                     'updated_at' => time()
                 ]
             ]);
