@@ -75,18 +75,73 @@ abstract class BaseController {
     }
     
     /**
+     * Get all HTTP headers (polyfill for environments where getallheaders() is not available)
+     *
+     * @return array The headers
+     */
+    protected function getAllHeaders(): array {
+        // Use native function if available
+        if (function_exists('getallheaders')) {
+            return getallheaders();
+        }
+        
+        // Otherwise, create the headers from $_SERVER
+        $headers = [];
+        foreach ($_SERVER as $name => $value) {
+            if (substr($name, 0, 5) === 'HTTP_') {
+                $name = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))));
+                $headers[$name] = $value;
+            } elseif ($name === 'CONTENT_TYPE' || $name === 'CONTENT_LENGTH') {
+                $name = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', $name))));
+                $headers[$name] = $value;
+            }
+        }
+        
+        return $headers;
+    }
+    
+    /**
      * Get Bearer token from Authorization header
      *
      * @return string|null The token or null if not found
      */
     protected function getBearerToken(): ?string {
-        $headers = getallheaders();
-        $auth = $headers['Authorization'] ?? '';
+        // Try multiple methods to get Authorization header
         
-        if (preg_match('/Bearer\s(\S+)/', $auth, $matches)) {
-            return $matches[1];
+        // 1. Check headers from getAllHeaders function
+        $headers = $this->getAllHeaders();
+        foreach ($headers as $key => $value) {
+            if (strtolower($key) === 'authorization') {
+                $auth = $value;
+                error_log("Found Authorization header in getAllHeaders: " . substr($auth, 0, 20) . "...");
+                if (preg_match('/Bearer\s(\S+)/', $auth, $matches)) {
+                    error_log("Extracted token from getAllHeaders: " . substr($matches[1], 0, 20) . "...");
+                    return $matches[1];
+                }
+            }
         }
         
+        // 2. Direct check in $_SERVER['HTTP_AUTHORIZATION']
+        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+            $auth = $_SERVER['HTTP_AUTHORIZATION'];
+            error_log("Found HTTP_AUTHORIZATION in _SERVER: " . substr($auth, 0, 20) . "...");
+            if (preg_match('/Bearer\s(\S+)/', $auth, $matches)) {
+                error_log("Extracted token from HTTP_AUTHORIZATION: " . substr($matches[1], 0, 20) . "...");
+                return $matches[1];
+            }
+        }
+        
+        // 3. Check REDIRECT_HTTP_AUTHORIZATION (for Apache with mod_rewrite)
+        if (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            $auth = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+            error_log("Found REDIRECT_HTTP_AUTHORIZATION in _SERVER: " . substr($auth, 0, 20) . "...");
+            if (preg_match('/Bearer\s(\S+)/', $auth, $matches)) {
+                error_log("Extracted token from REDIRECT_HTTP_AUTHORIZATION: " . substr($matches[1], 0, 20) . "...");
+                return $matches[1];
+            }
+        }
+        
+        error_log("No Authorization header found with Bearer token");
         return null;
     }
 }
