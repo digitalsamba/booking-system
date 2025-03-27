@@ -30,9 +30,16 @@ This backend API provides a complete solution for managing bookings, users, avai
    cd booking-system-backend
    composer install
    ```
-3. Configure MongoDB connection in `config/database.php`
-4. Set up JWT secret key in `config/auth.php`
-5. Configure Digital Samba API keys in `config/digitalsamba.php`
+3. Set up MongoDB:
+   - Install MongoDB locally
+   - OR run MongoDB using Docker:
+     ```
+     docker run -d -p 27017:27017 --name mongodb mongo
+     ```
+   - **Note for VirtualBox VM users**: If running in a VM with limited CPU features, consider using an older MongoDB version compatible with your environment
+4. Configure MongoDB connection in `config/database.php`
+5. Set up JWT secret key in `config/auth.php`
+6. Configure Digital Samba API keys in `config/digitalsamba.php`
 
 ## Configuration
 
@@ -65,6 +72,21 @@ The application provides several testing utilities:
 - Booking customer test: `php booking-system-backend/test_booking_customer.php`
 - Simple test interface: Open `/public/test-provider-api-simple.html` in a browser
 - Full booking test interface: Open `/public/test-provider-booking.html` in a browser
+
+### Testing Notes
+
+1. **Directory Structure**: The application uses PSR-4 autoloading with the namespace `App\` mapping to the `src/` directory. Class namespaces must match directory structure capitalization (e.g., `App\Controllers\AuthController` must be in `src/Controllers/AuthController.php`).
+
+2. **MongoDB Testing**: The `mongodb_integration_test.php` script is useful for verifying MongoDB connectivity. For VirtualBox VMs without AVX support, use MongoDB 4.4 or earlier.
+
+3. **Test Order**:
+   - First run `php booking-system-backend/mongodb_integration_test.php` to verify database connectivity
+   - Then run `php booking-system-backend/api_test.php` to test basic API functionality
+   - Finally use the web interfaces for interactive testing
+
+4. **Troubleshooting**:
+   - Most "class not found" errors are related to namespace/directory capitalization mismatches
+   - MongoDB connection issues may require changing the MongoDB version or connection string in `config/database.php`
 
 ## Architecture
 
