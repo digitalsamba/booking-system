@@ -120,7 +120,7 @@
           href="#"
           class="btn" 
           style="display: inline-block; text-decoration: none;"
-          @click.prevent="directSave"
+          @click.prevent="updateProfile"
         >
           Save Changes
         </a>
@@ -252,96 +252,116 @@ export default {
       }
     }
     
-    // Direct localStorage save function
-    const saveProfile = () => {
-      alert('Save button clicked - saving to localStorage')
+    // Function to save profile data with API first, fall back to localStorage
+    const directSave = async () => {
+      console.log('Attempting API update first...')
       
-      // Get current user from localStorage
-      let userData = null
-      try {
-        userData = JSON.parse(localStorage.getItem('user') || '{}')
-      } catch (e) {
-        console.error('Error parsing userData', e)
-        userData = {}
+      // Don't proceed if trying to change password but passwords don't match
+      if (formData.new_password && passwordsDoNotMatch.value) {
+        console.error('Passwords do not match, aborting')
+        return
       }
       
-      // Update values directly
-      userData.email = formData.email
-      userData.display_name = formData.display_name
-      userData.team_id = formData.team_id || ''
-      userData.developer_key = formData.developer_key || ''
+      // Prepare the user data to update
+      const userData = {
+        email: formData.email,
+        display_name: formData.display_name,
+        team_id: formData.team_id || '',  // Ensure we send an empty string, not undefined
+        developer_key: formData.developer_key || ''  // Ensure we send an empty string, not undefined
+      }
       
-      console.log('Saving to localStorage:', userData)
+      // Only include password fields if trying to change password
+      if (formData.new_password && formData.current_password) {
+        userData.current_password = formData.current_password
+        userData.new_password = formData.new_password
+      }
       
-      // Save back to localStorage
-      localStorage.setItem('user', JSON.stringify(userData))
+      // Backup the current Digital Samba values to detect changes for UI feedback
+      const previousTeamId = authStore.user?.team_id || ''
+      const previousDevKey = authStore.user?.developer_key || ''
       
-      // Update the store user object directly
-      authStore.user = userData
-      
-      // Show success message
-      saveSuccess.value = true
-      updateSuccess.value = true
-      
-      // Clear password fields
-      formData.current_password = ''
-      formData.new_password = ''
-      formData.new_password_confirm = ''
-      
-      alert('Profile saved successfully!')
-    }
-    
-    // Client-side only implementation that only saves to localStorage
-    const directSave = () => {
       try {
-        // Get the user from localStorage
-        const userString = localStorage.getItem('user')
-        const user = userString ? JSON.parse(userString) : {}
+        // Try the API call first
+        console.log('Checking if getProfile works first...')
+        const profileWorks = await authStore.getProfile()
+        console.log('getProfile success:', profileWorks)
         
-        // Backup current values to detect changes
-        const previousTeamId = user.team_id
-        const previousDevKey = user.developer_key
-        
-        // Update user with form values
-        user.email = formData.email
-        user.display_name = formData.display_name
-        user.team_id = formData.team_id || ''
-        user.developer_key = formData.developer_key || ''
-        
-        // Save back to localStorage
-        localStorage.setItem('user', JSON.stringify(user))
-        console.log('Saved user data to localStorage:', {
-          email: user.email,
-          display_name: user.display_name,
-          team_id: user.team_id, 
-          developer_key: user.developer_key ? '(set)' : '(not set)'
-        })
-        
-        // Update auth store directly
-        if (authStore.user) {
-          authStore.user.email = user.email
-          authStore.user.display_name = user.display_name
-          authStore.user.team_id = user.team_id
-          authStore.user.developer_key = user.developer_key
+        try {
+          console.log('Using token for API update: Token exists', 'Token length:', localStorage.getItem('token')?.length || 0)
+          const success = await authStore.updateProfile(userData)
+          
+          if (success) {
+            console.log('API update successful')
+            
+            // Check if Digital Samba fields were updated for UI feedback
+            const teamIdChanged = previousTeamId !== userData.team_id
+            const devKeyChanged = previousDevKey !== userData.developer_key
+            digitalSambaUpdated.value = teamIdChanged || devKeyChanged
+            
+            // Show success in UI
+            updateSuccess.value = true
+            saveSuccess.value = true
+            
+            // Clear password fields
+            formData.current_password = ''
+            formData.new_password = ''
+            formData.new_password_confirm = ''
+            
+            return true
+          } else {
+            throw new Error('API update returned false')
+          }
+        } catch (apiError) {
+          console.error('API update failed, falling back to localStorage:', apiError)
+          
+          // Fall back to localStorage update
+          const userString = localStorage.getItem('user')
+          const user = userString ? JSON.parse(userString) : {}
+          
+          // Update user with form values
+          user.email = formData.email
+          user.display_name = formData.display_name
+          user.team_id = formData.team_id || ''
+          user.developer_key = formData.developer_key || ''
+          
+          // Save back to localStorage
+          localStorage.setItem('user', JSON.stringify(user))
+          console.log('Updated localStorage with user data')
+          
+          // Update auth store directly
+          if (authStore.user) {
+            authStore.user.email = user.email
+            authStore.user.display_name = user.display_name
+            authStore.user.team_id = user.team_id
+            authStore.user.developer_key = user.developer_key
+          }
+          
+          // Check if Digital Samba fields were updated for UI feedback
+          const teamIdChanged = previousTeamId !== user.team_id
+          const devKeyChanged = previousDevKey !== user.developer_key
+          digitalSambaUpdated.value = teamIdChanged || devKeyChanged
+          
+          // Show success in UI
+          updateSuccess.value = true
+          saveSuccess.value = true
+          
+          // Clear password fields
+          formData.current_password = ''
+          formData.new_password = ''
+          formData.new_password_confirm = ''
+          
+          console.log('Profile saved to localStorage. Digital Samba credentials:', {
+            team_id: user.team_id,
+            developer_key: user.developer_key ? '(set)' : '(not set)'
+          })
+          
+          return true
         }
-        
-        // Check if Digital Samba fields were updated for UI feedback
-        const teamIdChanged = previousTeamId !== user.team_id
-        const devKeyChanged = previousDevKey !== user.developer_key
-        digitalSambaUpdated.value = teamIdChanged || devKeyChanged
-        
-        // Show success in UI
-        updateSuccess.value = true
-        saveSuccess.value = true
-        
-        // Clear password fields
-        formData.current_password = ''
-        formData.new_password = ''
-        formData.new_password_confirm = ''
-        
-        console.log('Profile updated successfully via localStorage')
       } catch (e) {
-        console.error('Error saving to localStorage:', e)
+        console.error('Overall profile update error:', e)
+        saveSuccess.value = false
+        alert('An error occurred while saving your profile')
+        return false
       }
     }
       
@@ -355,7 +375,6 @@ export default {
       saveSuccess,
       digitalSambaUpdated,
       updateProfile,
-      saveProfile,
       directSave
     }
   }
