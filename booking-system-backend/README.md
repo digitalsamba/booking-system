@@ -164,8 +164,26 @@ For detailed documentation on the Digital Samba integration, see [docs/digital-s
 
 - `GET /availability` - List available time slots
 - `POST /availability` - Create availability slots
+- `POST /availability/generate` - Generate availability slots based on a template
+- `GET /availability/:id` - Get availability slot details
 - `PUT /availability/:id` - Update availability
-- `DELETE /availability/:id` - Remove availability
+- `DELETE /availability/:id` - Remove availability slot
+
+#### Generate Availability Slots
+
+The `/availability/generate` endpoint automatically creates multiple availability slots based on a template:
+
+Request body format:
+```json
+{
+  "start_date": "2025-04-01",
+  "end_date": "2025-04-30",
+  "slot_duration": 30,
+  "daily_start_time": "09:00",
+  "daily_end_time": "17:00",
+  "days_of_week": [1, 2, 3, 4, 5]
+}
+```
 
 ### Service Endpoints
 
