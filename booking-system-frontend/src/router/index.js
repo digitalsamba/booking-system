@@ -7,7 +7,7 @@ const LoginView = () => import('../views/LoginView.vue')
 const RegisterView = () => import('../views/RegisterView.vue')
 const BookingsView = () => import('../views/BookingsView.vue')
 const ProfileView = () => import('../views/ProfileView.vue')
-// Debug component removed
+const AvailabilityView = () => import('../views/AvailabilityView.vue')
 
 const routes = [
   {
@@ -40,7 +40,12 @@ const routes = [
     component: ProfileView,
     meta: { requiresAuth: true }
   },
-  // Debug route removed
+  {
+    path: '/availability',
+    name: 'availability',
+    component: AvailabilityView,
+    meta: { requiresAuth: true }
+  }
 ]
 
 const router = createRouter({

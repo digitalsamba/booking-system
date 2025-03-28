@@ -16,6 +16,11 @@
         <h3>Your Profile</h3>
         <p>Update your profile information</p>
       </router-link>
+
+      <router-link to="/availability" class="card dashboard-card">
+        <h3>Manage Availability</h3>
+        <p>Set up your schedule and available time slots</p>
+      </router-link>
     </div>
   </div>
 </template>
