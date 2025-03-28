@@ -83,6 +83,12 @@ class AvailabilityController extends BaseController {
      * @param string $id Slot ID
      */
     public function deleteSlot($id) {
+        // Ensure the request method is DELETE
+        if ($_SERVER['REQUEST_METHOD'] !== 'DELETE') {
+            Response::json(['error' => 'Invalid request method. Use DELETE.'], 405);
+            return;
+        }
+
         // Check authentication
         $userId = $this->getUserId();
         if (!$userId) {
