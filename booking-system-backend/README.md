@@ -167,7 +167,11 @@ For detailed documentation on the Digital Samba integration, see [docs/digital-s
 - `POST /availability/generate` - Generate availability slots based on a template
 - `GET /availability/:id` - Get availability slot details
 - `PUT /availability/:id` - Update availability
-- `DELETE /availability/:id` - Remove availability slot
+- `DELETE /availability/deleteSlot?id={slot_id}` - Remove availability slot (Note: Uses query parameter format)
+
+> **⚠️ Important Note on API Implementation**: While the API follows REST naming conventions for most endpoints, 
+> the delete availability endpoint specifically requires using the query parameter format 
+> (`/availability/deleteSlot?id={slot_id}`) rather than the path parameter format.
 
 #### Generate Availability Slots
 

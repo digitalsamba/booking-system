@@ -78,15 +78,12 @@
           <div class="slot-list">
             <div v-for="slot in daySlots" :key="slot.id" class="slot-item">
               <span class="slot-time">{{ formatTime(slot.start_time) }} - {{ formatTime(slot.end_time) }}</span>
-              <span class="slot-id">ID: {{ slot.id ? slot.id.substring(0, 6) + '...' : 'missing' }}</span>
               <button class="delete-btn" @click="deleteSlot(slot.id)" :disabled="!slot.id">×</button>
             </div>
           </div>
         </div>
       </div>
     </div>
-
-    <button @click="testEndpoint" class="btn btn-secondary">Test API Parameters</button>
   </div>
 </template>
 
@@ -165,12 +162,6 @@ export default {
         
         if (data.success) {
           slots.value = data.slots
-          
-          // Add debug logging to examine the slot structure
-          console.log('Loaded slots:', slots.value);
-          if (slots.value.length > 0) {
-            console.log('Sample slot structure:', slots.value[0]);
-          }
         } else {
           message.value = {
             type: 'alert-error',
@@ -252,11 +243,7 @@ export default {
       }
       
       try {
-        // Log the request for debugging
-        console.log(`Deleting slot with ID: ${slotId}`);
-        
-        // Use DELETE method with the slot ID in the URL path
-        const response = await fetch(`/api/availability/${slotId}`, {
+        const response = await fetch(`/api/availability/deleteSlot?id=${slotId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -284,41 +271,6 @@ export default {
           type: 'alert-error',
           text: 'Error deleting availability slot'
         };
-      }
-    }
-
-    // Add this method for testing
-    const testEndpoint = async () => {
-      const testId = '12345';
-      
-      console.log("Testing endpoint with different URL patterns...");
-      
-      // Test 1: Path parameter style
-      try {
-        const response1 = await fetch(`/api/availability/testParams/${testId}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        const data1 = await response1.json();
-        console.log("Test 1 (Path parameter):", data1);
-      } catch (e) {
-        console.error("Test 1 failed:", e);
-      }
-      
-      // Test 2: Query parameter style
-      try {
-        const response2 = await fetch(`/api/availability/testParams?id=${testId}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        const data2 = await response2.json();
-        console.log("Test 2 (Query parameter):", data2);
-      } catch (e) {
-        console.error("Test 2 failed:", e);
       }
     }
     
@@ -358,8 +310,7 @@ export default {
       generateSlots,
       deleteSlot,
       formatDate,
-      formatTime,
-      testEndpoint
+      formatTime
     }
   }
 }
@@ -457,11 +408,6 @@ export default {
 
 .slot-time {
   font-size: 0.9rem;
-}
-
-.slot-id {
-  font-size: 0.8rem;
-  color: #666;
 }
 
 .delete-btn {

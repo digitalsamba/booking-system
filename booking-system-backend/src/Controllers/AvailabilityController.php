@@ -80,12 +80,20 @@ class AvailabilityController extends BaseController {
     /**
      * Delete a slot
      * 
-     * @param string $id Slot ID
+     * NOTE: This endpoint is called using the format: DELETE /availability/deleteSlot?id={slotId}
+     * The ID is retrieved from the query parameter, not from the URL path.
      */
-    public function deleteSlot($id) {
+    public function deleteSlot() {
         // Ensure the request method is DELETE
         if ($_SERVER['REQUEST_METHOD'] !== 'DELETE') {
             Response::json(['error' => 'Invalid request method. Use DELETE.'], 405);
+            return;
+        }
+
+        // Get ID from query parameter
+        $id = $_GET['id'] ?? null;
+        if (!$id) {
+            Response::json(['error' => 'Missing slot ID'], 400);
             return;
         }
 
@@ -96,13 +104,13 @@ class AvailabilityController extends BaseController {
             return;
         }
         
-        // Delete slot
-        $result = $this->availabilityModel->deleteSlot($id);
+        // Pass BOTH parameters to the model method - this model method requires both ID and userId
+        $result = $this->availabilityModel->deleteSlot($id, $userId);
         
         if ($result) {
-            Response::json(['message' => 'Slot deleted successfully']);
+            Response::json(['success' => true, 'message' => 'Slot deleted successfully']);
         } else {
-            Response::json(['error' => 'Failed to delete slot'], 400);
+            Response::json(['success' => false, 'error' => 'Failed to delete slot'], 400);
         }
     }
     
