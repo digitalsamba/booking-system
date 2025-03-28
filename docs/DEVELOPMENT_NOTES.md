@@ -48,6 +48,60 @@ The system now correctly stores and retrieves Digital Samba credentials in the u
    - Create a testing endpoint for Digital Samba integration
    - Add UI feedback when Digital Samba credentials are invalid
 
+## SambaConnect Branding (March 2025)
+
+The application has been branded as "SambaConnect" with consistent styling across all components.
+
+### Branding Elements
+
+1. **Brand Name:**
+   - Application name: SambaConnect
+   - Provider: Digital Samba
+
+2. **Color Palette:**
+   - Primary color: `#f06859` (coral/salmon)
+   - Secondary color: `#323e66` (navy blue)
+   - CSS variables are defined in `src/assets/main.css`
+
+3. **Typography:**
+   - Primary font: Inter (sans-serif)
+   - Font is imported from Google Fonts
+   - Font weights used: 400 (regular), 500 (medium), 600 (semibold), 700 (bold)
+
+4. **Logo:**
+   - SVG format stored at `public/assets/logo.svg`
+   - Used in LoginView, RegisterView, and other key entry points
+   - Component available as `AppLogo.vue` for consistent display
+
+### Implementation Details
+
+1. **CSS Variables:**
+   - Global variables defined in `src/assets/main.css`
+   - Applied consistently across components via CSS inheritance
+
+2. **Component Styling:**
+   - Forms and buttons use the Inter font family
+   - Headers use the brand colors (primary for highlights, secondary for main text)
+   - Consistent border radius (8px) and shadow styling for cards and modals
+
+3. **Login/Register Experience:**
+   - Updated with brand logo and colors
+   - Consistent styling between authentication views
+
+### Future Branding Improvements
+
+1. **Favicon Implementation:**
+   - Add branded favicon based on the logo
+   - Update manifest.json with app icons in various sizes
+
+2. **Email Templates:**
+   - Apply branding to email notifications
+   - Create consistent header/footer for emails
+
+3. **Print Styles:**
+   - Add print-specific stylesheets for booking confirmations
+   - Ensure logo displays properly in print context
+
 ## Troubleshooting Common Issues
 
 1. **Authentication Problems:**
