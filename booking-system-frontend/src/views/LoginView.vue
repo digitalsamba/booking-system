@@ -94,12 +94,20 @@ export default {
   max-width: 500px;
   margin: 0 auto;
   padding: 2rem;
+  font-family: 'Inter', sans-serif;
 }
 
 .logo-container {
   display: flex;
   justify-content: center;
   margin-bottom: 2rem;
+}
+
+.login h1 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  text-align: center;
+  color: var(--secondary-color);
 }
 
 .login-form {

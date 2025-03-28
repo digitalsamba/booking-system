@@ -146,13 +146,6 @@
         </div>
         <div class="modal-body">
           <p>Your profile has been updated successfully!</p>
-          <div v-if="digitalSambaUpdated" class="digital-samba-info">
-            <p><strong>Digital Samba Credentials Updated:</strong></p>
-            <ul>
-              <li><strong>Team ID:</strong> {{ formData.team_id ? 'Set ✓' : 'Not Set' }}</li>
-              <li><strong>Developer Key:</strong> {{ formData.developer_key ? 'Set ✓' : 'Not Set' }}</li>
-            </ul>
-          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-primary" @click="updateSuccess = false">Close</button>
@@ -173,7 +166,6 @@ export default {
     const authStore = useAuthStore()
     const updateSuccess = ref(false)
     const saveSuccess = ref(false)
-    const digitalSambaUpdated = ref(false)
     const teamIdInput = ref(null)
     
     // Computed property to determine if Digital Samba credentials are missing
@@ -251,11 +243,6 @@ export default {
           userData.new_password = formData.new_password
         }
         
-        // Check if Digital Samba fields were updated
-        const dsTeamIdUpdated = formData.team_id !== (authStore.user?.team_id || '')
-        const dsDevKeyUpdated = formData.developer_key !== (authStore.user?.developer_key || '')
-        digitalSambaUpdated.value = dsTeamIdUpdated || dsDevKeyUpdated
-        
         console.log('About to call authStore.updateProfile')
         const success = await authStore.updateProfile(userData)
         console.log('authStore.updateProfile returned:', success)
@@ -317,11 +304,6 @@ export default {
           if (success) {
             console.log('API update successful')
             
-            // Check if Digital Samba fields were updated for UI feedback
-            const teamIdChanged = previousTeamId !== userData.team_id
-            const devKeyChanged = previousDevKey !== userData.developer_key
-            digitalSambaUpdated.value = teamIdChanged || devKeyChanged
-            
             // Show success in UI
             updateSuccess.value = true
             saveSuccess.value = true
@@ -360,11 +342,6 @@ export default {
             authStore.user.developer_key = user.developer_key
           }
           
-          // Check if Digital Samba fields were updated for UI feedback
-          const teamIdChanged = previousTeamId !== user.team_id
-          const devKeyChanged = previousDevKey !== user.developer_key
-          digitalSambaUpdated.value = teamIdChanged || devKeyChanged
-          
           // Show success in UI
           updateSuccess.value = true
           saveSuccess.value = true
@@ -389,15 +366,12 @@ export default {
       }
     }
       
-    // Function removed
-    
     return {
       authStore,
       formData,
       passwordsDoNotMatch,
       updateSuccess,
       saveSuccess,
-      digitalSambaUpdated,
       missingCredentials,
       teamIdInput,
       updateProfile,
