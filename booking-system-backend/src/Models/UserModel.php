@@ -235,7 +235,9 @@ class UserModel extends BaseModel {
                 'display_name',
                 'email',
                 'profile',
-                'preferences'
+                'preferences',
+                'team_id',
+                'developer_key'
             ];
             
             $updateData = [];

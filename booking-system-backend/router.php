@@ -195,5 +195,11 @@ if (preg_match('#^booking/([^/]+)/meeting-links$#', $uri, $matches)) {
     exit;
 }
 
+// Debug endpoint for authentication troubleshooting
+if ($uri === 'auth-debug') {
+    include_once __DIR__ . '/public/auth_debug.php';
+    exit;
+}
+
 // For all other routes, include the main application entry point
 include_once __DIR__ . '/public/index.php';

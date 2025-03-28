@@ -1,9 +1,9 @@
 <template>
   <div class="home">
-    <h1>Welcome to the Booking System</h1>
+    <h1>Welcome to SambaConnect</h1>
     <div v-if="user" class="welcome-message">
       <h2>Hello, {{ user.display_name || user.username }}!</h2>
-      <p>Use the navigation to manage your bookings and profile.</p>
+      <p>Manage your video meetings with Digital Samba's powerful platform.</p>
     </div>
     
     <div class="dashboard-cards">

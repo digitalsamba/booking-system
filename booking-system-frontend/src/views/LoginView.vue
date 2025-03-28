@@ -1,5 +1,9 @@
 <template>
   <div class="login">
+    <div class="logo-container">
+      <AppLogo :logoUrl="logoUrl" />
+    </div>
+    
     <h1>Login</h1>
     
     <div v-if="authStore.error" class="alert alert-error">
@@ -46,15 +50,20 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import AppLogo from '../components/AppLogo.vue'
 
 export default {
   name: 'LoginView',
+  components: {
+    AppLogo
+  },
   setup() {
     const router = useRouter()
     const authStore = useAuthStore()
     
     const username = ref('')
     const password = ref('')
+    const logoUrl = ref('/assets/logo.svg') // Path to your logo once uploaded
     
     const handleLogin = async () => {
       const credentials = {
@@ -73,7 +82,8 @@ export default {
       username,
       password,
       authStore,
-      handleLogin
+      handleLogin,
+      logoUrl
     }
   }
 }
@@ -84,6 +94,20 @@ export default {
   max-width: 500px;
   margin: 0 auto;
   padding: 2rem;
+  font-family: 'Inter', sans-serif;
+}
+
+.logo-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.login h1 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  text-align: center;
+  color: var(--secondary-color);
 }
 
 .login-form {

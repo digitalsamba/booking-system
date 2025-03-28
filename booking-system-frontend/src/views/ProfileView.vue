@@ -57,26 +57,36 @@
       <h3>Digital Samba Integration</h3>
       <p class="section-description">These settings are required for video meeting functionality</p>
       
-      <div class="form-group">
-        <label for="team_id">Digital Samba Team ID:</label>
-        <input 
-          type="text" 
-          id="team_id" 
-          v-model="formData.team_id" 
-          class="form-control" 
-        />
-        <span class="field-note">Your Digital Samba team identifier</span>
-      </div>
-      
-      <div class="form-group">
-        <label for="developer_key">Developer Key:</label>
-        <input 
-          type="password" 
-          id="developer_key" 
-          v-model="formData.developer_key" 
-          class="form-control" 
-        />
-        <span class="field-note">Your Digital Samba API developer key</span>
+      <div class="ds-section" :class="{ 'highlight-section': missingCredentials }">
+        <div v-if="missingCredentials" class="missing-credentials-alert">
+          <i class="alert-icon">⚠️</i> 
+          These settings are required for video meetings to work
+        </div>
+        
+        <div class="form-group">
+          <label for="team_id">Digital Samba Team ID:</label>
+          <input 
+            type="text" 
+            id="team_id" 
+            v-model="formData.team_id" 
+            class="form-control"
+            :class="{ 'highlight-field': !formData.team_id }"
+            ref="teamIdInput"
+          />
+          <span class="field-note">Your Digital Samba team identifier</span>
+        </div>
+        
+        <div class="form-group">
+          <label for="developer_key">Developer Key:</label>
+          <input 
+            type="password" 
+            id="developer_key" 
+            v-model="formData.developer_key" 
+            class="form-control"
+            :class="{ 'highlight-field': !formData.developer_key }"
+          />
+          <span class="field-note">Your Digital Samba API developer key</span>
+        </div>
       </div>
       
       <div class="form-divider"></div>
@@ -120,7 +130,7 @@
           href="#"
           class="btn" 
           style="display: inline-block; text-decoration: none;"
-          @click.prevent="directSave"
+          @click.prevent="updateProfile"
         >
           Save Changes
         </a>
@@ -136,13 +146,6 @@
         </div>
         <div class="modal-body">
           <p>Your profile has been updated successfully!</p>
-          <div v-if="digitalSambaUpdated" class="digital-samba-info">
-            <p><strong>Digital Samba Credentials Updated:</strong></p>
-            <ul>
-              <li><strong>Team ID:</strong> {{ formData.team_id ? 'Set ✓' : 'Not Set' }}</li>
-              <li><strong>Developer Key:</strong> {{ formData.developer_key ? 'Set ✓' : 'Not Set' }}</li>
-            </ul>
-          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-primary" @click="updateSuccess = false">Close</button>
@@ -163,7 +166,12 @@ export default {
     const authStore = useAuthStore()
     const updateSuccess = ref(false)
     const saveSuccess = ref(false)
-    const digitalSambaUpdated = ref(false)
+    const teamIdInput = ref(null)
+    
+    // Computed property to determine if Digital Samba credentials are missing
+    const missingCredentials = computed(() => {
+      return !formData.team_id || !formData.developer_key
+    })
     
     const formData = reactive({
       username: '',
@@ -199,6 +207,14 @@ export default {
           formData.developer_key = authStore.user.developer_key || ''
         }
       }
+      
+      // Focus on the team_id input if credentials are missing
+      // Use setTimeout to ensure the ref is mounted
+      setTimeout(() => {
+        if (!formData.team_id && teamIdInput.value) {
+          teamIdInput.value.focus()
+        }
+      }, 200)
     })
     
     const updateProfile = async () => {
@@ -227,11 +243,6 @@ export default {
           userData.new_password = formData.new_password
         }
         
-        // Check if Digital Samba fields were updated
-        const dsTeamIdUpdated = formData.team_id !== (authStore.user?.team_id || '')
-        const dsDevKeyUpdated = formData.developer_key !== (authStore.user?.developer_key || '')
-        digitalSambaUpdated.value = dsTeamIdUpdated || dsDevKeyUpdated
-        
         console.log('About to call authStore.updateProfile')
         const success = await authStore.updateProfile(userData)
         console.log('authStore.updateProfile returned:', success)
@@ -252,110 +263,118 @@ export default {
       }
     }
     
-    // Direct localStorage save function
-    const saveProfile = () => {
-      alert('Save button clicked - saving to localStorage')
+    // Function to save profile data with API first, fall back to localStorage
+    const directSave = async () => {
+      console.log('Attempting API update first...')
       
-      // Get current user from localStorage
-      let userData = null
-      try {
-        userData = JSON.parse(localStorage.getItem('user') || '{}')
-      } catch (e) {
-        console.error('Error parsing userData', e)
-        userData = {}
+      // Don't proceed if trying to change password but passwords don't match
+      if (formData.new_password && passwordsDoNotMatch.value) {
+        console.error('Passwords do not match, aborting')
+        return
       }
       
-      // Update values directly
-      userData.email = formData.email
-      userData.display_name = formData.display_name
-      userData.team_id = formData.team_id || ''
-      userData.developer_key = formData.developer_key || ''
+      // Prepare the user data to update
+      const userData = {
+        email: formData.email,
+        display_name: formData.display_name,
+        team_id: formData.team_id || '',  // Ensure we send an empty string, not undefined
+        developer_key: formData.developer_key || ''  // Ensure we send an empty string, not undefined
+      }
       
-      console.log('Saving to localStorage:', userData)
+      // Only include password fields if trying to change password
+      if (formData.new_password && formData.current_password) {
+        userData.current_password = formData.current_password
+        userData.new_password = formData.new_password
+      }
       
-      // Save back to localStorage
-      localStorage.setItem('user', JSON.stringify(userData))
+      // Backup the current Digital Samba values to detect changes for UI feedback
+      const previousTeamId = authStore.user?.team_id || ''
+      const previousDevKey = authStore.user?.developer_key || ''
       
-      // Update the store user object directly
-      authStore.user = userData
-      
-      // Show success message
-      saveSuccess.value = true
-      updateSuccess.value = true
-      
-      // Clear password fields
-      formData.current_password = ''
-      formData.new_password = ''
-      formData.new_password_confirm = ''
-      
-      alert('Profile saved successfully!')
-    }
-    
-    // Client-side only implementation that only saves to localStorage
-    const directSave = () => {
       try {
-        // Get the user from localStorage
-        const userString = localStorage.getItem('user')
-        const user = userString ? JSON.parse(userString) : {}
+        // Try the API call first
+        console.log('Checking if getProfile works first...')
+        const profileWorks = await authStore.getProfile()
+        console.log('getProfile success:', profileWorks)
         
-        // Backup current values to detect changes
-        const previousTeamId = user.team_id
-        const previousDevKey = user.developer_key
-        
-        // Update user with form values
-        user.email = formData.email
-        user.display_name = formData.display_name
-        user.team_id = formData.team_id || ''
-        user.developer_key = formData.developer_key || ''
-        
-        // Save back to localStorage
-        localStorage.setItem('user', JSON.stringify(user))
-        console.log('Saved user data to localStorage:', {
-          email: user.email,
-          display_name: user.display_name,
-          team_id: user.team_id, 
-          developer_key: user.developer_key ? '(set)' : '(not set)'
-        })
-        
-        // Update auth store directly
-        if (authStore.user) {
-          authStore.user.email = user.email
-          authStore.user.display_name = user.display_name
-          authStore.user.team_id = user.team_id
-          authStore.user.developer_key = user.developer_key
+        try {
+          console.log('Using token for API update: Token exists', 'Token length:', localStorage.getItem('token')?.length || 0)
+          const success = await authStore.updateProfile(userData)
+          
+          if (success) {
+            console.log('API update successful')
+            
+            // Show success in UI
+            updateSuccess.value = true
+            saveSuccess.value = true
+            
+            // Clear password fields
+            formData.current_password = ''
+            formData.new_password = ''
+            formData.new_password_confirm = ''
+            
+            return true
+          } else {
+            throw new Error('API update returned false')
+          }
+        } catch (apiError) {
+          console.error('API update failed, falling back to localStorage:', apiError)
+          
+          // Fall back to localStorage update
+          const userString = localStorage.getItem('user')
+          const user = userString ? JSON.parse(userString) : {}
+          
+          // Update user with form values
+          user.email = formData.email
+          user.display_name = formData.display_name
+          user.team_id = formData.team_id || ''
+          user.developer_key = formData.developer_key || ''
+          
+          // Save back to localStorage
+          localStorage.setItem('user', JSON.stringify(user))
+          console.log('Updated localStorage with user data')
+          
+          // Update auth store directly
+          if (authStore.user) {
+            authStore.user.email = user.email
+            authStore.user.display_name = user.display_name
+            authStore.user.team_id = user.team_id
+            authStore.user.developer_key = user.developer_key
+          }
+          
+          // Show success in UI
+          updateSuccess.value = true
+          saveSuccess.value = true
+          
+          // Clear password fields
+          formData.current_password = ''
+          formData.new_password = ''
+          formData.new_password_confirm = ''
+          
+          console.log('Profile saved to localStorage. Digital Samba credentials:', {
+            team_id: user.team_id,
+            developer_key: user.developer_key ? '(set)' : '(not set)'
+          })
+          
+          return true
         }
-        
-        // Check if Digital Samba fields were updated for UI feedback
-        const teamIdChanged = previousTeamId !== user.team_id
-        const devKeyChanged = previousDevKey !== user.developer_key
-        digitalSambaUpdated.value = teamIdChanged || devKeyChanged
-        
-        // Show success in UI
-        updateSuccess.value = true
-        saveSuccess.value = true
-        
-        // Clear password fields
-        formData.current_password = ''
-        formData.new_password = ''
-        formData.new_password_confirm = ''
-        
-        console.log('Profile updated successfully via localStorage')
       } catch (e) {
-        console.error('Error saving to localStorage:', e)
+        console.error('Overall profile update error:', e)
+        saveSuccess.value = false
+        alert('An error occurred while saving your profile')
+        return false
       }
     }
       
-    // Function removed
-    
     return {
       authStore,
       formData,
       passwordsDoNotMatch,
       updateSuccess,
       saveSuccess,
-      digitalSambaUpdated,
+      missingCredentials,
+      teamIdInput,
       updateProfile,
-      saveProfile,
       directSave
     }
   }
@@ -504,5 +523,40 @@ export default {
   border-radius: 4px;
   padding: 1rem;
   margin-top: 1rem;
+}
+
+/* Digital Samba section highlighting */
+.ds-section {
+  padding: 1.5rem;
+  border-radius: 5px;
+  transition: all 0.3s ease;
+}
+
+.highlight-section {
+  background-color: #fff8e1;
+  border: 1px solid #ffecb3;
+  box-shadow: 0 2px 5px rgba(255, 193, 7, 0.2);
+}
+
+.highlight-field {
+  border-color: #ff9800 !important;
+  background-color: #fff8e1 !important;
+  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2) !important;
+}
+
+.missing-credentials-alert {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+  border-left: 4px solid #ffc107;
+  display: flex;
+  align-items: center;
+}
+
+.alert-icon {
+  margin-right: 0.5rem;
+  font-size: 1.25rem;
 }
 </style>
