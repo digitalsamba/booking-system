@@ -34,17 +34,31 @@ export const useAuthStore = defineStore('auth', {
       
       try {
         const response = await authService.login(credentials)
+        console.log('Login response:', response.data)
         
-        this.token = response.data.token
-        this.user = response.data.user
+        if (response.data.success && response.data.data) {
+          // Extract token and user from the data object
+          const { token, user } = response.data.data
+          
+          if (token && user) {
+            this.token = token
+            this.user = user
+            
+            // Store in localStorage
+            localStorage.setItem('token', this.token)
+            localStorage.setItem('user', JSON.stringify(this.user))
+            
+            console.log('Login successful, token and user stored')
+            return true
+          }
+        }
         
-        // Store in localStorage
-        localStorage.setItem('token', this.token)
-        localStorage.setItem('user', JSON.stringify(this.user))
-        
-        return true
+        console.error('Invalid login response:', response.data)
+        this.error = 'Invalid response from server'
+        return false
       } catch (error) {
-        this.error = error.response?.data.error?.message || 'Failed to login'
+        console.error('Login error:', error)
+        this.error = error.response?.data?.error || 'Failed to login'
         return false
       } finally {
         this.loading = false

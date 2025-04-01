@@ -14,6 +14,17 @@ use Exception;
 
 abstract class BaseController {
     /**
+     * Send a JSON response
+     *
+     * @param mixed $data Response data
+     * @param int $statusCode HTTP status code
+     * @return void
+     */
+    protected function jsonResponse($data, int $statusCode = 200): void {
+        Response::json($data, $statusCode);
+    }
+
+    /**
      * Get JSON data from request body
      *
      * @return array The parsed JSON data

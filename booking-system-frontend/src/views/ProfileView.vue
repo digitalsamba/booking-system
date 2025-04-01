@@ -126,32 +126,38 @@
       </div>
       
       <div class="form-actions">
-        <a 
-          href="#"
-          class="btn" 
-          style="display: inline-block; text-decoration: none;"
-          @click.prevent="updateProfile"
+        <v-btn
+          color="primary"
+          @click="updateProfile"
+          :loading="authStore.loading"
         >
           Save Changes
-        </a>
+        </v-btn>
       </div>
     </div>
     
-    <!-- Success Modal -->
-    <div v-if="updateSuccess" class="modal-overlay">
-      <div class="modal">
-        <div class="modal-header">
-          <h3>Profile Updated</h3>
-          <button class="close-btn" @click="updateSuccess = false">×</button>
-        </div>
-        <div class="modal-body">
-          <p>Your profile has been updated successfully!</p>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-primary" @click="updateSuccess = false">Close</button>
-        </div>
+    <!-- Success Notification -->
+    <v-snackbar
+      v-model="showSuccess"
+      color="success"
+      timeout="3000"
+      location="top"
+      class="success-snackbar"
+    >
+      <div class="d-flex align-center">
+        <v-icon start color="white" class="mr-2">mdi-check-circle</v-icon>
+        <span>Your profile has been updated successfully!</span>
       </div>
-    </div>
+      <template v-slot:actions>
+        <v-btn
+          color="white"
+          variant="text"
+          @click="showSuccess = false"
+        >
+          Close
+        </v-btn>
+      </template>
+    </v-snackbar>
   </div>
 </template>
 
@@ -166,6 +172,7 @@ export default {
     const authStore = useAuthStore()
     const updateSuccess = ref(false)
     const saveSuccess = ref(false)
+    const showSuccess = ref(false)
     const teamIdInput = ref(null)
     
     // Computed property to determine if Digital Samba credentials are missing
@@ -249,6 +256,8 @@ export default {
         
         if (success) {
           updateSuccess.value = true
+          saveSuccess.value = true
+          showSuccess.value = true
           // Clear password fields
           formData.current_password = ''
           formData.new_password = ''
@@ -372,6 +381,7 @@ export default {
       passwordsDoNotMatch,
       updateSuccess,
       saveSuccess,
+      showSuccess,
       missingCredentials,
       teamIdInput,
       updateProfile,
@@ -383,14 +393,57 @@ export default {
 
 <style scoped>
 .profile {
-  max-width: 600px;
+  max-width: 800px;
   margin: 0 auto;
   padding: 2rem;
 }
 
+.profile h1 {
+  margin-bottom: 2rem;
+  color: var(--secondary-color);
+}
+
 .profile-form {
-  margin-top: 2rem;
+  background: white;
   padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--secondary-color);
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.form-control:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.form-control.highlight-field {
+  border-color: #ff6b6b;
+  background-color: #fff5f5;
+}
+
+.field-note {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #666;
 }
 
 .form-divider {
@@ -400,50 +453,43 @@ export default {
 }
 
 .section-description {
-  font-size: 0.9rem;
   color: #666;
-  margin-top: -0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.ds-section {
+  background-color: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 6px;
+  margin-bottom: 2rem;
+}
+
+.ds-section.highlight-section {
+  background-color: #fff5f5;
+  border: 1px solid #ff6b6b;
+}
+
+.missing-credentials-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #d32f2f;
   margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: #ffebee;
+  border-radius: 4px;
+}
+
+.alert-icon {
+  font-size: 1.25rem;
 }
 
 .form-actions {
   margin-top: 2rem;
+  text-align: right;
 }
 
-.field-note {
-  display: block;
-  font-size: 0.8rem;
-  color: #666;
-  margin-top: 0.25rem;
-}
-
-.error-message {
-  color: var(--error-color);
-  font-size: 0.85rem;
-  display: block;
-  margin-top: 0.5rem;
-}
-
-.alert-error {
-  color: #721c24;
-  background-color: #f8d7da;
-  padding: 1rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
-.alert-success {
-  color: #155724;
-  background-color: #d4edda;
-  padding: 1rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
-.loading {
-  text-align: center;
-  padding: 2rem;
-}
+/* Remove the old .btn styles since we're using Vuetify's v-btn now */
 
 /* Modal styles */
 .modal-overlay {
@@ -454,46 +500,30 @@ export default {
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
   z-index: 1000;
 }
 
 .modal {
   background: white;
   border-radius: 8px;
-  width: 90%;
+  padding: 2rem;
   max-width: 500px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-  text-align: left;
+  width: 90%;
+  position: relative;
 }
 
 .modal-header {
-  padding: 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #42b983;
-  color: white;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
+  margin-bottom: 1.5rem;
 }
 
-.modal-body {
-  padding: 1.5rem;
-  line-height: 1.6;
-}
-
-.modal-body ul {
-  margin-left: 1.5rem;
-  margin-bottom: 1rem;
-}
-
-.modal-footer {
-  padding: 1rem;
-  display: flex;
-  justify-content: flex-end;
-  border-top: 1px solid #eee;
+.modal-header h3 {
+  margin: 0;
+  color: var(--secondary-color);
 }
 
 .close-btn {
@@ -501,62 +531,57 @@ export default {
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: white;
+  color: #666;
 }
 
-.btn-primary {
-  background-color: #42b983;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
+.modal-body {
+  margin-bottom: 1.5rem;
 }
 
-.btn-primary:hover {
-  opacity: 0.9;
+.modal-footer {
+  text-align: right;
 }
 
-.digital-samba-info {
-  background-color: #f8f9fa;
-  border-radius: 4px;
+/* Alert styles */
+.alert {
   padding: 1rem;
-  margin-top: 1rem;
-}
-
-/* Digital Samba section highlighting */
-.ds-section {
-  padding: 1.5rem;
-  border-radius: 5px;
-  transition: all 0.3s ease;
-}
-
-.highlight-section {
-  background-color: #fff8e1;
-  border: 1px solid #ffecb3;
-  box-shadow: 0 2px 5px rgba(255, 193, 7, 0.2);
-}
-
-.highlight-field {
-  border-color: #ff9800 !important;
-  background-color: #fff8e1 !important;
-  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2) !important;
-}
-
-.missing-credentials-alert {
-  background-color: #fff3cd;
-  color: #856404;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
   border-radius: 4px;
-  border-left: 4px solid #ffc107;
-  display: flex;
-  align-items: center;
+  margin-bottom: 1rem;
 }
 
-.alert-icon {
-  margin-right: 0.5rem;
-  font-size: 1.25rem;
+.alert-error {
+  background-color: #ffebee;
+  color: #d32f2f;
+  border: 1px solid #ffcdd2;
+}
+
+.alert-success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.success-snackbar {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.success-snackbar :deep(.v-snackbar__content) {
+  padding: 12px 16px;
+}
+
+.success-snackbar :deep(.v-snackbar__actions) {
+  padding: 0 16px 0 0;
+}
+
+.success-snackbar :deep(.v-btn) {
+  text-transform: none;
+  font-weight: 500;
 }
 </style>

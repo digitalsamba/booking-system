@@ -172,4 +172,35 @@ class PublicController extends BaseController {
             Response::json(['error' => 'Failed to create booking'], 500);
         }
     }
+
+    /**
+     * Get provider details by ID
+     */
+    public function getProviderDetails($id) {
+        try {
+            error_log("PUBLIC CONTROLLER: Fetching provider details for ID: " . $id);
+            
+            // Find the user by ID
+            $user = $this->userModel->findById($id);
+            
+            if (!$user) {
+                error_log("PUBLIC CONTROLLER: Provider not found with ID: " . $id);
+                return $this->jsonResponse(['error' => 'Provider not found'], 404);
+            }
+
+            error_log("PUBLIC CONTROLLER: Found provider: " . json_encode($user));
+            
+            // Return only the necessary provider information
+            return $this->jsonResponse([
+                'id' => $user['id'],
+                'display_name' => $user['display_name'] ?? $user['username'],
+                'email' => $user['email'],
+                'username' => $user['username']
+            ]);
+        } catch (\Exception $e) {
+            error_log("PUBLIC CONTROLLER: Error in getProviderDetails: " . $e->getMessage());
+            error_log("PUBLIC CONTROLLER: Stack trace: " . $e->getTraceAsString());
+            return $this->jsonResponse(['error' => 'Error fetching provider details: ' . $e->getMessage()], 500);
+        }
+    }
 }
