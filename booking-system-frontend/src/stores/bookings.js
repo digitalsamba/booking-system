@@ -11,6 +11,7 @@ export const useBookingsStore = defineStore('bookings', {
   
   getters: {
     upcomingBookings: (state) => {
+      if (!state.bookings) return []
       return state.bookings.filter(booking => 
         new Date(booking.start_time) >= new Date() && 
         booking.status !== 'cancelled'
@@ -18,6 +19,7 @@ export const useBookingsStore = defineStore('bookings', {
     },
     
     pastBookings: (state) => {
+      if (!state.bookings) return []
       return state.bookings.filter(booking => 
         new Date(booking.start_time) < new Date() || 
         booking.status === 'cancelled'
@@ -32,10 +34,14 @@ export const useBookingsStore = defineStore('bookings', {
       
       try {
         const response = await bookingService.getBookings()
-        this.bookings = response.data.bookings
+        console.log('Bookings response:', response.data)
+        // Handle the response structure where bookings are in data.items
+        this.bookings = response.data?.data?.items || []
         return this.bookings
       } catch (error) {
-        this.error = error.response?.data.error?.message || 'Failed to fetch bookings'
+        console.error('Error fetching bookings:', error)
+        this.error = error.response?.data?.error?.message || 'Failed to fetch bookings'
+        this.bookings = [] // Ensure bookings is always an array
         return []
       } finally {
         this.loading = false

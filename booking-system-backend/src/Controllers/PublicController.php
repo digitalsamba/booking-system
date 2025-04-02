@@ -44,8 +44,13 @@ class PublicController extends BaseController {
     public function availability() {
         // Get username from query parameters
         $username = isset($_GET['username']) ? $_GET['username'] : null;
+        $startDate = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-d');
+        $endDate = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d', strtotime('+7 days'));
+        
+        error_log("PUBLIC CONTROLLER: Availability request for username: {$username}, start_date: {$startDate}, end_date: {$endDate}");
         
         if (!$username) {
+            error_log("PUBLIC CONTROLLER: No username provided");
             Response::json(['error' => 'Provider username is required'], 400);
             return;
         }
@@ -54,16 +59,22 @@ class PublicController extends BaseController {
         $user = $this->userModel->findByUsername($username);
         
         if (!$user) {
+            error_log("PUBLIC CONTROLLER: Provider not found with username: {$username}");
             Response::json(['error' => 'Provider not found'], 404);
             return;
         }
         
-        // Get date range from query parameters
-        $startDate = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-d');
-        $endDate = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d', strtotime('+7 days'));
+        error_log("PUBLIC CONTROLLER: Found provider with ID: " . (string)$user['_id']);
         
         // Get available slots
         $slots = $this->availabilityModel->getSlots($user['_id'], $startDate, $endDate);
+        error_log("PUBLIC CONTROLLER: Retrieved " . count($slots) . " slots");
+        
+        if (empty($slots)) {
+            error_log("PUBLIC CONTROLLER: No slots found for the specified date range");
+        } else {
+            error_log("PUBLIC CONTROLLER: First slot data: " . json_encode($slots[0]));
+        }
         
         Response::json([
             'provider' => [
@@ -174,25 +185,26 @@ class PublicController extends BaseController {
     }
 
     /**
-     * Get provider details by ID
+     * Get provider details by username
      */
-    public function getProviderDetails($id) {
+    public function getProviderDetails($username) {
         try {
-            error_log("PUBLIC CONTROLLER: Fetching provider details for ID: " . $id);
+            error_log("PUBLIC CONTROLLER: Fetching provider details for username: " . $username);
             
-            // Find the user by ID
-            $user = $this->userModel->findById($id);
+            // Find the user by username
+            $user = $this->userModel->findByUsername($username);
             
             if (!$user) {
-                error_log("PUBLIC CONTROLLER: Provider not found with ID: " . $id);
-                return $this->jsonResponse(['error' => 'Provider not found'], 404);
+                error_log("PUBLIC CONTROLLER: Provider not found with username: " . $username);
+                Response::json(['error' => 'Provider not found'], 404);
+                return;
             }
 
             error_log("PUBLIC CONTROLLER: Found provider: " . json_encode($user));
             
             // Return only the necessary provider information
-            return $this->jsonResponse([
-                'id' => $user['id'],
+            Response::json([
+                'id' => (string)$user['_id'],
                 'display_name' => $user['display_name'] ?? $user['username'],
                 'email' => $user['email'],
                 'username' => $user['username']
@@ -200,7 +212,7 @@ class PublicController extends BaseController {
         } catch (\Exception $e) {
             error_log("PUBLIC CONTROLLER: Error in getProviderDetails: " . $e->getMessage());
             error_log("PUBLIC CONTROLLER: Stack trace: " . $e->getTraceAsString());
-            return $this->jsonResponse(['error' => 'Error fetching provider details: ' . $e->getMessage()], 500);
+            Response::json(['error' => 'Error fetching provider details: ' . $e->getMessage()], 500);
         }
     }
 }
