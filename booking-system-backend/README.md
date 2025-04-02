@@ -16,6 +16,10 @@ This backend API provides a complete solution for managing bookings, users, avai
   - Day of week selection
   - Individual and bulk slot deletion
 - Integration with Digital Samba for video conferencing
+- CORS support for frontend integration
+- Rate limiting and security measures
+- Comprehensive error handling
+- Input validation and sanitization
 
 ## Table of Contents
 
@@ -53,6 +57,7 @@ This backend API provides a complete solution for managing bookings, users, avai
 4. Configure MongoDB connection in `config/database.php`
 5. Set up JWT secret key in `config/auth.php`
 6. Configure Digital Samba API keys in `config/digitalsamba.php`
+7. Set up CORS configuration in `config/cors.php` if needed
 
 ## Configuration
 
@@ -62,6 +67,7 @@ The application uses configuration files located in the `config/` directory:
 - `auth.php` - JWT token settings
 - `digitalsamba.php` - Digital Samba integration settings
 - `cors.php` - CORS policy configuration
+- `rate_limit.php` - Rate limiting settings
 
 ## Development
 
@@ -101,6 +107,7 @@ The application provides several testing utilities:
 4. **Troubleshooting**:
    - Most "class not found" errors are related to namespace/directory capitalization mismatches
    - MongoDB connection issues may require changing the MongoDB version or connection string in `config/database.php`
+   - CORS issues may require updating the allowed origins in `config/cors.php`
 
 ## Architecture
 
@@ -110,6 +117,7 @@ The application follows an MVC architecture:
 - **Models**: Interact with MongoDB database
 - **Utils**: Provide common functionality (Response, JwtAuth, etc.)
 - **Router**: Routes API requests to appropriate controllers
+- **Middleware**: Handle authentication, CORS, and rate limiting
 
 ## Authentication
 
@@ -259,6 +267,11 @@ Common error codes:
 - Improved MongoDB query optimization
 - Added validation for slot generation parameters
 - Enhanced error messages and response formatting
+- Added CORS support for frontend integration
+- Implemented rate limiting
+- Added input validation and sanitization
+- Improved security measures
+- Enhanced Digital Samba integration error handling
 
 ## Development
 - PHP 8.1 or higher
@@ -284,3 +297,6 @@ php api_test.php
 - MongoDB injection prevention
 - CORS configuration
 - Rate limiting
+- Secure password hashing
+- XSS prevention
+- CSRF protection
