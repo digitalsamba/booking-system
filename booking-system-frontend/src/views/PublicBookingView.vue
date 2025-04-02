@@ -5,7 +5,14 @@
         <v-card class="pa-6">
           <div class="text-center mb-6">
             <img src="/assets/logo.svg" alt="SambaConnect" height="48" class="mb-4">
-            <h1 class="text-h4 mb-2">Book a Meeting with {{ provider.display_name || 'Loading...' }}</h1>
+            <h1 class="text-h4 mb-2">
+              <template v-if="provider && (provider.display_name || provider.username)">
+                Book a Meeting with {{ provider.display_name || provider.username }}
+              </template>
+              <template v-else>
+                <v-progress-circular indeterminate></v-progress-circular>
+              </template>
+            </h1>
             <p class="text-body-1 text-medium-emphasis">Select an available time slot below</p>
           </div>
 
@@ -16,6 +23,15 @@
             class="mb-6"
           >
             {{ error }}
+          </v-alert>
+
+          <!-- Success Message -->
+          <v-alert
+            v-if="success"
+            type="success"
+            class="mb-6"
+          >
+            {{ success }}
           </v-alert>
 
           <!-- Date Selection -->
@@ -33,6 +49,16 @@
                     class="mt-2"
                     full-width
                     elevation="0"
+                    :day-format="(date) => {
+                      const formattedDate = new Date(date).toLocaleDateString('en-CA')
+                      return availableDates.has(formattedDate) ? '●' : ''
+                    }"
+                    :day-props="(date) => {
+                      const formattedDate = new Date(date).toLocaleDateString('en-CA')
+                      return {
+                        class: availableDates.has(formattedDate) ? 'available-date' : ''
+                      }
+                    }"
                   ></v-date-picker>
                 </v-col>
               </v-row>
@@ -47,8 +73,8 @@
                 <v-col v-for="slot in availableSlots" :key="slot.id" cols="12" sm="6" md="4">
                   <v-btn
                     block
-                    :color="slot.isSelected ? 'primary' : 'default'"
-                    :variant="slot.isSelected ? 'flat' : 'outlined'"
+                    :color="slot.id === selectedSlot?.id ? 'primary' : 'default'"
+                    :variant="slot.id === selectedSlot?.id ? 'flat' : 'outlined'"
                     @click="selectTimeSlot(slot)"
                     :disabled="slot.isBooked"
                   >
@@ -110,23 +136,26 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { providerService } from '../services/api'
+import { useRoute, useRouter } from 'vue-router'
+import { publicBookingService } from '../services/api'
 
 export default {
   name: 'PublicBookingView',
   setup() {
     const route = useRoute()
+    const router = useRouter()
     const form = ref(null)
     const isFormValid = ref(false)
     const isSubmitting = ref(false)
     const error = ref(null)
+    const success = ref(null)
     
     // Provider details
     const provider = ref({})
     const selectedDate = ref(null)
     const selectedSlot = ref(null)
     const availableSlots = ref([])
+    const availableDates = ref(new Set()) // Store dates that have availability
     
     // Form data
     const bookingForm = ref({
@@ -148,21 +177,55 @@ export default {
     })
 
     const allowedDates = (date) => {
-      // Add any specific date restrictions here
-      return true
+      // Convert the date to YYYY-MM-DD format for comparison
+      const formattedDate = new Date(date).toLocaleDateString('en-CA')
+      return availableDates.value.has(formattedDate)
+    }
+
+    // Load available dates for the current month
+    const loadAvailableDates = async () => {
+      try {
+        const today = new Date()
+        const startDate = today.toLocaleDateString('en-CA')
+        const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 30).toLocaleDateString('en-CA')
+        
+        console.log('Loading available dates from', startDate, 'to', endDate)
+        
+        const response = await publicBookingService.getAvailableSlots(
+          route.params.username,
+          startDate,
+          endDate
+        )
+        
+        if (response.data?.data?.slots) {
+          // Extract unique dates from slots
+          const dates = new Set()
+          response.data.data.slots.forEach(slot => {
+            const slotDate = new Date(slot.start_time).toLocaleDateString('en-CA')
+            dates.add(slotDate)
+          })
+          availableDates.value = dates
+          console.log('Available dates:', Array.from(dates))
+        }
+      } catch (err) {
+        console.error('Error loading available dates:', err)
+      }
     }
 
     // Load provider details
     const loadProviderDetails = async () => {
       try {
-        const providerId = route.params.providerId
-        if (!providerId) {
+        const username = route.params.username
+        if (!username) {
           error.value = 'Invalid provider link'
           return
         }
 
-        const response = await providerService.getProviderDetails(providerId)
-        provider.value = response.data
+        const response = await publicBookingService.getProviderDetails(username)
+        console.log('Provider details response:', response.data)
+        provider.value = response.data.data // Access the nested data property
+        // Load available dates after getting provider details
+        await loadAvailableDates()
       } catch (err) {
         console.error('Error loading provider details:', err)
         error.value = 'Unable to load provider details. Please try again later.'
@@ -174,11 +237,44 @@ export default {
       if (!selectedDate.value) return
       
       try {
-        const response = await providerService.getAvailableSlots(route.params.providerId, selectedDate.value)
-        availableSlots.value = response.data
+        // Format the selected date to YYYY-MM-DD in UTC
+        const date = new Date(selectedDate.value)
+        const formattedDate = date.toLocaleDateString('en-CA')
+        console.log('Loading slots for date:', formattedDate)
+        
+        const response = await publicBookingService.getAvailableSlots(
+          route.params.username,
+          formattedDate,
+          formattedDate // Use the same date for both start and end
+        )
+        
+        console.log('Response from backend:', response.data)
+        
+        // Transform slots data for display
+        if (response.data?.data?.slots) {
+          // Filter slots to only include those for the selected date
+          const selectedDateStr = new Date(selectedDate.value).toLocaleDateString('en-CA')
+          availableSlots.value = response.data.data.slots
+            .filter(slot => {
+              const slotDate = new Date(slot.start_time).toLocaleDateString('en-CA')
+              return slotDate === selectedDateStr
+            })
+            .map(slot => ({
+              id: slot.id,
+              startTime: new Date(slot.start_time),
+              endTime: new Date(slot.end_time),
+              isBooked: !slot.is_available
+            }))
+          console.log('Transformed slots:', availableSlots.value)
+          error.value = null
+        } else {
+          availableSlots.value = []
+          error.value = 'No available slots found for this date.'
+        }
       } catch (err) {
         console.error('Error loading available slots:', err)
-        error.value = 'Unable to load available time slots. Please try again.'
+        error.value = err.response?.data?.error || 'Unable to load available time slots. Please try again.'
+        availableSlots.value = []
       }
     }
 
@@ -187,26 +283,45 @@ export default {
       selectedSlot.value = slot
     }
 
-    const formatTime = (time) => {
-      return time // TODO: Implement proper time formatting
+    const formatTime = (date) => {
+      return new Date(date).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      })
     }
 
     const submitBooking = async () => {
       if (!form.value.validate()) return
       
       isSubmitting.value = true
+      error.value = null
+      success.value = null
+      
       try {
-        await providerService.createBooking(route.params.providerId, {
-          ...bookingForm.value,
-          slot: selectedSlot.value,
-          date: selectedDate.value
-        })
+        const response = await publicBookingService.createBooking(
+          route.params.username,
+          {
+            ...bookingForm.value,
+            slot: selectedSlot.value
+          }
+        )
         
-        // Show success message and redirect
-        // TODO: Implement success handling
+        success.value = 'Booking created successfully! You will receive a confirmation email shortly.'
+        
+        // Clear form and selection
+        bookingForm.value = {
+          name: '',
+          email: '',
+          notes: ''
+        }
+        selectedSlot.value = null
+        
+        // Reload available slots to update the UI
+        await loadAvailableSlots()
       } catch (err) {
         console.error('Booking failed:', err)
-        error.value = 'Unable to create booking. Please try again.'
+        error.value = err.message || 'Unable to create booking. Please try again.'
       } finally {
         isSubmitting.value = false
       }
@@ -221,11 +336,13 @@ export default {
       selectedDate,
       selectedSlot,
       availableSlots,
+      availableDates,
       bookingForm,
       form,
       isFormValid,
       isSubmitting,
       error,
+      success,
       minDate,
       maxDate,
       allowedDates,
@@ -241,5 +358,21 @@ export default {
 <style scoped>
 .v-date-picker {
   width: 100%;
+}
+
+.available-date {
+  position: relative;
+}
+
+.available-date::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background-color: var(--v-primary-base);
+  border-radius: 50%;
 }
 </style> 

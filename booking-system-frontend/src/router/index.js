@@ -8,6 +8,7 @@ const RegisterView = () => import('../views/RegisterView.vue')
 const BookingsView = () => import('../views/BookingsView.vue')
 const ProfileView = () => import('../views/ProfileView.vue')
 const AvailabilityView = () => import('../views/AvailabilityView.vue')
+const PublicBookingView = () => import('../views/PublicBookingView.vue')
 
 const routes = [
   {
@@ -45,6 +46,12 @@ const routes = [
     name: 'availability',
     component: AvailabilityView,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/booking/:username',
+    name: 'public-booking',
+    component: PublicBookingView,
+    meta: { requiresAuth: false }
   }
 ]
 

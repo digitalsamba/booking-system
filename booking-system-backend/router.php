@@ -111,7 +111,7 @@ if (preg_match('#^public/booking$#', $uri)) {
 }
 
 // Provider details endpoint
-if (preg_match('#^providers/([^/]+)$#', $uri, $matches)) {
+if (preg_match('#^public/provider/([^/]+)$#', $uri, $matches)) {
     $controller = new \App\Controllers\PublicController();
     $controller->getProviderDetails($matches[1]);
     exit;

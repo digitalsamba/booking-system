@@ -157,25 +157,35 @@ class AvailabilityModel extends BaseModel {
      */
     public function getSlots(string $userId, string $startDate, string $endDate): array {
         try {
-            error_log("Getting slots for user: {$userId}, start: {$startDate}, end: {$endDate}");
-            
             $userObjectId = new ObjectId($userId);
-            $startDateTime = $this->toMongoDate($startDate . " 00:00:00");
-            $endDateTime = $this->toMongoDate($endDate . " 23:59:59");
             
-            error_log("Converted dates - start: " . $startDateTime->toDateTime()->format('Y-m-d H:i:s') . 
-                     ", end: " . $endDateTime->toDateTime()->format('Y-m-d H:i:s'));
+            error_log("AVAILABILITY MODEL: Getting slots for user {$userId} from {$startDate} to {$endDate}");
+            
+            // Create DateTime objects in UTC
+            $startDateTime = new \DateTime($startDate, new \DateTimeZone('UTC'));
+            $endDateTime = new \DateTime($endDate, new \DateTimeZone('UTC'));
+            
+            // Set time to start and end of day
+            $startDateTime->setTime(0, 0, 0);
+            $endDateTime->setTime(23, 59, 59);
+            
+            error_log("AVAILABILITY MODEL: Start DateTime: " . $startDateTime->format('Y-m-d H:i:s'));
+            error_log("AVAILABILITY MODEL: End DateTime: " . $endDateTime->format('Y-m-d H:i:s'));
+            
+            // Convert to MongoDB UTCDateTime
+            $startMongoDate = new UTCDateTime($startDateTime->getTimestamp() * 1000);
+            $endMongoDate = new UTCDateTime($endDateTime->getTimestamp() * 1000);
             
             $filter = [
                 'user_id' => $userObjectId,
                 'start_time' => [
-                    '$gte' => $startDateTime,
-                    '$lte' => $endDateTime
+                    '$gte' => $startMongoDate,
+                    '$lte' => $endMongoDate
                 ],
                 'is_available' => true
             ];
             
-            error_log("MongoDB filter: " . json_encode($filter));
+            error_log("AVAILABILITY MODEL: MongoDB filter: " . json_encode($filter));
             
             $options = [
                 'sort' => ['start_time' => 1]
@@ -188,10 +198,14 @@ class AvailabilityModel extends BaseModel {
                 $slots[] = $this->formatSlotForApi($document);
             }
             
-            error_log("Found " . count($slots) . " slots");
+            error_log("AVAILABILITY MODEL: Found " . count($slots) . " slots");
+            if (!empty($slots)) {
+                error_log("AVAILABILITY MODEL: First slot: " . json_encode($slots[0]));
+            }
+            
             return $slots;
         } catch (\Exception $e) {
-            error_log("Error getting availability slots: " . $e->getMessage());
+            error_log("AVAILABILITY MODEL ERROR: " . $e->getMessage());
             return [];
         }
     }

@@ -158,6 +158,39 @@
         </v-btn>
       </template>
     </v-snackbar>
+
+    <!-- Booking Link Section -->
+    <v-card class="mb-6">
+      <v-card-title class="text-h6">Your Booking Link</v-card-title>
+      <v-card-text>
+        <p class="text-body-2 text-medium-emphasis mb-4">
+          Share this link with your clients to let them book meetings with you.
+        </p>
+        <v-row align="center" class="mt-2">
+          <v-col cols="12" sm="8">
+            <v-text-field
+              :model-value="bookingLink"
+              readonly
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="booking-link-field"
+            ></v-text-field>
+          </v-col>
+          <v-col cols="12" sm="4">
+            <v-btn
+              color="primary"
+              variant="outlined"
+              @click="copyBookingLink"
+              :loading="isCopying"
+            >
+              <v-icon start>mdi-content-copy</v-icon>
+              {{ copyButtonText }}
+            </v-btn>
+          </v-col>
+        </v-row>
+      </v-card-text>
+    </v-card>
   </div>
 </template>
 
@@ -174,6 +207,8 @@ export default {
     const saveSuccess = ref(false)
     const showSuccess = ref(false)
     const teamIdInput = ref(null)
+    const isCopying = ref(false)
+    const copyButtonText = ref('Copy Link')
     
     // Computed property to determine if Digital Samba credentials are missing
     const missingCredentials = computed(() => {
@@ -194,6 +229,13 @@ export default {
     const passwordsDoNotMatch = computed(() => {
       return formData.new_password && formData.new_password_confirm && 
              formData.new_password !== formData.new_password_confirm
+    })
+    
+    // Compute the booking link
+    const bookingLink = computed(() => {
+      if (!authStore.user?.username) return ''
+      const baseUrl = window.location.origin
+      return `${baseUrl}/booking/${authStore.user.username}`
     })
     
     onMounted(async () => {
@@ -374,6 +416,23 @@ export default {
         return false
       }
     }
+    
+    // Copy booking link to clipboard
+    const copyBookingLink = async () => {
+      try {
+        isCopying.value = true
+        await navigator.clipboard.writeText(bookingLink.value)
+        copyButtonText.value = 'Copied!'
+        setTimeout(() => {
+          copyButtonText.value = 'Copy Link'
+        }, 2000)
+      } catch (err) {
+        console.error('Failed to copy link:', err)
+        alert('Failed to copy link to clipboard')
+      } finally {
+        isCopying.value = false
+      }
+    }
       
     return {
       authStore,
@@ -385,7 +444,11 @@ export default {
       missingCredentials,
       teamIdInput,
       updateProfile,
-      directSave
+      directSave,
+      bookingLink,
+      isCopying,
+      copyButtonText,
+      copyBookingLink
     }
   }
 }
@@ -583,5 +646,15 @@ export default {
 .success-snackbar :deep(.v-btn) {
   text-transform: none;
   font-weight: 500;
+}
+
+.booking-link-field {
+  background-color: var(--v-surface-variant);
+  border-radius: 4px;
+}
+
+.booking-link-field :deep(.v-field__input) {
+  font-family: monospace;
+  font-size: 0.875rem;
 }
 </style>
