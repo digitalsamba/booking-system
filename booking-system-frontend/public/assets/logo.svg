@@ -1,11 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="200" height="50" viewBox="0 0 200 50">
-  <defs>
-    <linearGradient id="connectGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#f06859;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#323e66;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <text x="10" y="30" font-family="Arial, sans-serif" font-weight="bold" font-size="24" fill="#f06859">Samba</text>
-  <text x="90" y="30" font-family="Arial, sans-serif" font-weight="bold" font-size="24" fill="#323e66">Connect</text>
-  <path d="M85,32 C90,32 95,18 100,18" stroke="url(#connectGradient)" stroke-width="2" fill="none" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 150">
+  <!-- Main logo elements -->
+  <g id="logo">
+    <!-- Base logo shape (similar to Digital Samba) - moved closer to text and lower -->
+    <g id="base-logo" transform="translate(25, 5)">
+      <!-- Connection dot on left -->
+      <circle cx="30" cy="75" r="8" fill="#F26A5A"/>
+      
+      <!-- Connection path -->
+      <path d="M30 75 L50 75" stroke="#F26A5A" stroke-width="8" stroke-linecap="round"/>
+      
+      <!-- Main circular shape but slightly smaller to accommodate calendar -->
+      <path d="M50 75 C50 58 64 45 80 45 C96 45 110 58 110 75 C110 92 96 105 80 105 C64 105 50 92 50 75 Z M80 55 C70 55 60 64 60 75 C60 86 70 95 80 95 C90 95 100 86 100 75 C100 64 90 55 80 55 Z" fill="#F26A5A"/>
+    </g>
+    
+    <!-- Calendar icon (positioned aligned with center of circle) -->
+    <g id="calendar" transform="translate(25, 5)">
+      <!-- Calendar outer shape with rounded corners -->
+      <rect x="65" y="65" width="30" height="30" rx="4" fill="white" stroke="#323E66" stroke-width="1.5"/>
+      
+      <!-- Calendar header bar -->
+      <rect x="65" y="65" width="30" height="8" rx="2" fill="#323E66"/>
+      
+      <!-- Calendar hanger parts -->
+      <rect x="72" y="60" width="5" height="7" rx="2" fill="#323E66"/>
+      <rect x="83" y="60" width="5" height="7" rx="2" fill="#323E66"/>
+      
+      <!-- Date display - OCT 01 -->
+      <text x="80" y="82" font-family="Arial, sans-serif" font-size="7" text-anchor="middle" fill="#666666">OCT</text>
+      <text x="80" y="93" font-family="Arial, sans-serif" font-weight="700" font-size="14" text-anchor="middle" fill="#323E66">01</text>
+    </g>
+    
+    <!-- Text "SambaConnect" -->
+    <g id="text">
+      <text x="140" y="85" font-family="Arial, sans-serif" font-weight="700" font-size="38" fill="#323E66">Samba</text>
+      <text x="265" y="87" font-family="Arial, sans-serif" font-weight="700" font-size="38" fill="#F26A5A">Connect</text>
+    </g>
+    
+    <!-- Subtitle with adjusted position and spacing -->
+    <text x="148" y="105" font-family="Arial, sans-serif" font-size="14" fill="#323E66" letter-spacing="0.7">Meeting Scheduling with Digital Samba</text>
+  </g>
+  
+  <!-- Decorative elements -->
+  <rect x="145" y="90" width="120" height="2" fill="#F26A5A"/>
 </svg>

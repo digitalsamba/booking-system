@@ -4,7 +4,7 @@
       <v-col cols="12" md="8">
         <v-card class="pa-6">
           <div class="text-center mb-6">
-            <img src="/assets/logo.svg" alt="SambaConnect" height="48" class="mb-4">
+            <img src="/assets/logo.svg" alt="SambaConnect" height="120" class="mb-4">
             <h1 class="text-h4 mb-2">
               <template v-if="provider && (provider.display_name || provider.username)">
                 Book a Meeting with {{ provider.display_name || provider.username }}

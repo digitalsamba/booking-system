@@ -27,20 +27,30 @@ export default {
 .app-logo {
   display: flex;
   align-items: center;
+  justify-content: center;
   font-weight: bold;
   font-size: 1.8rem;
+  min-height: 120px;
+  background: transparent;
+  width: 100%;
 }
 
 .app-logo.small {
   font-size: 1.2rem;
+  min-height: 80px;
 }
 
 .app-logo img {
-  max-height: 50px;
+  max-height: 120px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+  margin: 0 auto;
+  max-width: 100%;
 }
 
 .app-logo.small img {
-  max-height: 30px;
+  max-height: 80px;
 }
 
 .text-logo {

@@ -3,7 +3,7 @@
     <v-row justify="center">
       <v-col cols="12" class="text-center">
         <template v-if="user">
-          <img src="/assets/logo.svg" alt="SambaConnect" height="48" class="mb-6">
+          <img src="/assets/logo.svg" alt="SambaConnect" height="120" class="mb-6">
           <v-card class="mb-8 pa-4">
             <h2 class="text-h4 mb-2">Hello, {{ user.display_name || user.username }}!</h2>
             <p class="text-body-1">Manage your video meetings with Digital Samba's powerful platform.</p>
