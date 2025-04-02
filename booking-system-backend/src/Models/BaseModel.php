@@ -23,14 +23,25 @@ class BaseModel {
      * @param string $collectionName Name of the MongoDB collection
      */
     public function __construct(string $collectionName) {
-        // MongoDB connection parameters (consider moving these to config)
-        $mongoHost = 'mongodb://localhost:27017';
-        $mongoDb = 'booking_system';
-        
-        // Connect to MongoDB
-        $this->client = new Client($mongoHost);
-        $this->database = $this->client->selectDatabase($mongoDb);
-        $this->collection = $this->database->selectCollection($collectionName);
+        try {
+            // MongoDB connection parameters (consider moving these to config)
+            $mongoHost = 'mongodb://localhost:27017';
+            $mongoDb = 'booking_system';
+            
+            error_log("Attempting to connect to MongoDB at {$mongoHost}");
+            
+            // Connect to MongoDB
+            $this->client = new Client($mongoHost);
+            $this->database = $this->client->selectDatabase($mongoDb);
+            $this->collection = $this->database->selectCollection($collectionName);
+            
+            // Test the connection
+            $this->client->listDatabases();
+            error_log("Successfully connected to MongoDB");
+        } catch (\Exception $e) {
+            error_log("MongoDB connection error: " . $e->getMessage());
+            throw new \Exception("Failed to connect to database: " . $e->getMessage());
+        }
     }
     
     /**
@@ -67,11 +78,26 @@ class BaseModel {
      * @return UTCDateTime
      */
     protected function toMongoDate($date) {
-        if (is_numeric($date)) {
-            return new UTCDateTime($date * 1000);
+        try {
+            if (is_numeric($date)) {
+                return new UTCDateTime($date * 1000);
+            }
+            
+            // Try to parse the date string
+            $timestamp = strtotime($date);
+            if ($timestamp === false) {
+                throw new \InvalidArgumentException("Invalid date string: $date");
+            }
+            
+            // Create DateTime object in UTC
+            $dt = new \DateTime($date, new \DateTimeZone('UTC'));
+            
+            // Convert to timestamp and then to MongoDB UTCDateTime
+            return new UTCDateTime($dt->getTimestamp() * 1000);
+        } catch (\Exception $e) {
+            error_log("Error converting date to MongoDB format: " . $e->getMessage() . "\nInput: " . print_r($date, true));
+            throw $e;
         }
-        
-        return new UTCDateTime(strtotime($date) * 1000);
     }
     
     /**

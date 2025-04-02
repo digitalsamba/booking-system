@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="50" viewBox="0 0 200 50">
+  <defs>
+    <linearGradient id="connectGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f06859;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#323e66;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <text x="10" y="30" font-family="Arial, sans-serif" font-weight="bold" font-size="24" fill="#f06859">Samba</text>
+  <text x="90" y="30" font-family="Arial, sans-serif" font-weight="bold" font-size="24" fill="#323e66">Connect</text>
+  <path d="M85,32 C90,32 95,18 100,18" stroke="url(#connectGradient)" stroke-width="2" fill="none" />
+</svg>

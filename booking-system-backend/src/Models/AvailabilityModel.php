@@ -23,23 +23,45 @@ class AvailabilityModel extends BaseModel {
      * @throws \InvalidArgumentException If date is invalid
      */
     protected function toMongoDate($dateString): UTCDateTime {
-        if ($dateString instanceof UTCDateTime) {
-            return $dateString;
-        }
-        
-        if ($dateString instanceof \DateTime) {
-            return new UTCDateTime($dateString->getTimestamp() * 1000);
-        }
-        
-        if (is_string($dateString)) {
-            $timestamp = strtotime($dateString);
-            if ($timestamp === false) {
+        try {
+            if ($dateString instanceof UTCDateTime) {
+                return $dateString;
+            }
+            
+            if ($dateString instanceof \DateTime) {
+                return new UTCDateTime($dateString->getTimestamp() * 1000);
+            }
+            
+            if (is_string($dateString)) {
+                // Try different date formats
+                $formats = [
+                    'Y-m-d H:i:s',
+                    'Y-m-d\TH:i:s',
+                    'Y-m-d H:i',
+                    'Y-m-d'
+                ];
+                
+                foreach ($formats as $format) {
+                    $date = \DateTime::createFromFormat($format, $dateString);
+                    if ($date !== false) {
+                        return new UTCDateTime($date->getTimestamp() * 1000);
+                    }
+                }
+                
+                // If no format matched, try strtotime as a fallback
+                $timestamp = strtotime($dateString);
+                if ($timestamp !== false) {
+                    return new UTCDateTime($timestamp * 1000);
+                }
+                
                 throw new \InvalidArgumentException("Invalid date string: $dateString");
             }
-            return new UTCDateTime($timestamp * 1000);
+            
+            throw new \InvalidArgumentException("Invalid date format");
+        } catch (\Exception $e) {
+            error_log("Error converting date to MongoDB format: " . $e->getMessage() . "\nInput: " . print_r($dateString, true));
+            throw $e;
         }
-        
-        throw new \InvalidArgumentException("Invalid date format");
     }
     
     /**
@@ -50,36 +72,77 @@ class AvailabilityModel extends BaseModel {
      * @return bool True if successful, false otherwise
      */
     public function addSlots(string $userId, array $slots): bool {
-        $userObjectId = new ObjectId($userId);
-        
-        $documents = [];
-        
-        foreach ($slots as $slot) {
-            try {
-                // Create document for each slot
-                $documents[] = [
-                    'user_id' => $userObjectId,
-                    'start_time' => $this->toMongoDate($slot['start_time']),
-                    'end_time' => $this->toMongoDate($slot['end_time']),
-                    'is_available' => true,
-                    'created_at' => new UTCDateTime(time() * 1000),
-                    'updated_at' => new UTCDateTime(time() * 1000)
-                ];
-            } catch (\Exception $e) {
-                error_log("Error processing slot: " . $e->getMessage());
-                // Continue with other slots
-            }
-        }
-        
-        if (empty($documents)) {
-            return false;
-        }
-        
         try {
+            $userObjectId = new ObjectId($userId);
+            $documents = [];
+            $duplicates = [];
+            
+            error_log("Starting to process " . count($slots) . " slots for user: " . $userId);
+            
+            foreach ($slots as $slot) {
+                try {
+                    // Validate slot data
+                    if (!isset($slot['start_time']) || !isset($slot['end_time'])) {
+                        error_log("Invalid slot data: " . json_encode($slot));
+                        continue;
+                    }
+                    
+                    // Convert dates to MongoDB format
+                    $startTime = $this->toMongoDate($slot['start_time']);
+                    $endTime = $this->toMongoDate($slot['end_time']);
+                    
+                    // Check for existing slot using exact timestamp comparison
+                    $existingSlot = $this->collection->findOne([
+                        'user_id' => $userObjectId,
+                        'start_time' => $startTime,
+                        'end_time' => $endTime
+                    ]);
+                    
+                    if ($existingSlot) {
+                        $duplicates[] = [
+                            'start_time' => $slot['start_time'],
+                            'end_time' => $slot['end_time']
+                        ];
+                        continue;
+                    }
+                    
+                    // Create document for each slot
+                    $documents[] = [
+                        'user_id' => $userObjectId,
+                        'start_time' => $startTime,
+                        'end_time' => $endTime,
+                        'is_available' => true,
+                        'created_at' => new UTCDateTime(time() * 1000),
+                        'updated_at' => new UTCDateTime(time() * 1000)
+                    ];
+                } catch (\Exception $e) {
+                    error_log("Error processing slot: " . $e->getMessage() . "\nSlot data: " . json_encode($slot));
+                    continue;
+                }
+            }
+            
+            if (empty($documents)) {
+                if (!empty($duplicates)) {
+                    error_log("All slots were duplicates. Duplicate slots: " . json_encode($duplicates));
+                    return false;
+                }
+                error_log("No valid slots to insert");
+                return false;
+            }
+            
+            error_log("Attempting to insert " . count($documents) . " slots");
+            
             $result = $this->collection->insertMany($documents);
+            
+            if (!empty($duplicates)) {
+                error_log("Some slots were duplicates. Created: {$result->getInsertedCount()}, Duplicates: " . count($duplicates));
+            } else {
+                error_log("Successfully inserted " . $result->getInsertedCount() . " slots");
+            }
+            
             return $result->getInsertedCount() > 0;
         } catch (\Exception $e) {
-            error_log("Error adding availability slots: " . $e->getMessage());
+            error_log("Error in addSlots: " . $e->getMessage());
             return false;
         }
     }
@@ -95,17 +158,34 @@ class AvailabilityModel extends BaseModel {
     public function getSlots(string $userId, string $startDate, string $endDate): array {
         try {
             $userObjectId = new ObjectId($userId);
-            $startDateTime = $this->toMongoDate($startDate . " 00:00:00");
-            $endDateTime = $this->toMongoDate($endDate . " 23:59:59");
+            
+            error_log("AVAILABILITY MODEL: Getting slots for user {$userId} from {$startDate} to {$endDate}");
+            
+            // Create DateTime objects in UTC
+            $startDateTime = new \DateTime($startDate, new \DateTimeZone('UTC'));
+            $endDateTime = new \DateTime($endDate, new \DateTimeZone('UTC'));
+            
+            // Set time to start and end of day
+            $startDateTime->setTime(0, 0, 0);
+            $endDateTime->setTime(23, 59, 59);
+            
+            error_log("AVAILABILITY MODEL: Start DateTime: " . $startDateTime->format('Y-m-d H:i:s'));
+            error_log("AVAILABILITY MODEL: End DateTime: " . $endDateTime->format('Y-m-d H:i:s'));
+            
+            // Convert to MongoDB UTCDateTime
+            $startMongoDate = new UTCDateTime($startDateTime->getTimestamp() * 1000);
+            $endMongoDate = new UTCDateTime($endDateTime->getTimestamp() * 1000);
             
             $filter = [
                 'user_id' => $userObjectId,
                 'start_time' => [
-                    '$gte' => $startDateTime,
-                    '$lte' => $endDateTime
+                    '$gte' => $startMongoDate,
+                    '$lte' => $endMongoDate
                 ],
                 'is_available' => true
             ];
+            
+            error_log("AVAILABILITY MODEL: MongoDB filter: " . json_encode($filter));
             
             $options = [
                 'sort' => ['start_time' => 1]
@@ -118,9 +198,14 @@ class AvailabilityModel extends BaseModel {
                 $slots[] = $this->formatSlotForApi($document);
             }
             
+            error_log("AVAILABILITY MODEL: Found " . count($slots) . " slots");
+            if (!empty($slots)) {
+                error_log("AVAILABILITY MODEL: First slot: " . json_encode($slots[0]));
+            }
+            
             return $slots;
         } catch (\Exception $e) {
-            error_log("Error getting availability slots: " . $e->getMessage());
+            error_log("AVAILABILITY MODEL ERROR: " . $e->getMessage());
             return [];
         }
     }
@@ -370,6 +455,27 @@ class AvailabilityModel extends BaseModel {
             return $success;
         } catch (\Exception $e) {
             error_log("AVAILABILITY MODEL ERROR: Exception while marking slot unavailable: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Delete all availability slots for a user
+     *
+     * @param string $userId User ID
+     * @return bool True if successful, false otherwise
+     */
+    public function deleteAllSlots(string $userId): bool {
+        try {
+            $userObjectId = new ObjectId($userId);
+            
+            $result = $this->collection->deleteMany([
+                'user_id' => $userObjectId
+            ]);
+            
+            return $result->getDeletedCount() > 0;
+        } catch (\Exception $e) {
+            error_log("Error deleting all availability slots: " . $e->getMessage());
             return false;
         }
     }

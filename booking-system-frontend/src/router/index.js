@@ -7,7 +7,8 @@ const LoginView = () => import('../views/LoginView.vue')
 const RegisterView = () => import('../views/RegisterView.vue')
 const BookingsView = () => import('../views/BookingsView.vue')
 const ProfileView = () => import('../views/ProfileView.vue')
-// Debug component removed
+const AvailabilityView = () => import('../views/AvailabilityView.vue')
+const PublicBookingView = () => import('../views/PublicBookingView.vue')
 
 const routes = [
   {
@@ -40,7 +41,18 @@ const routes = [
     component: ProfileView,
     meta: { requiresAuth: true }
   },
-  // Debug route removed
+  {
+    path: '/availability',
+    name: 'availability',
+    component: AvailabilityView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/booking/:username',
+    name: 'public-booking',
+    component: PublicBookingView,
+    meta: { requiresAuth: false }
+  }
 ]
 
 const router = createRouter({

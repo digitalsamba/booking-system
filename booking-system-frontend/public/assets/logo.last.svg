@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 150">
+  <!-- Main logo elements -->
+  <g id="logo">
+    <!-- Stylized icon based on Digital Samba logo -->
+    <g id="icon">
+      <!-- Coral/salmon colored shape inspired by Digital Samba logo -->
+      <path d="M50 75 C50 58 64 45 80 45 C96 45 110 58 110 75 C110 92 96 105 80 105 C64 105 50 92 50 75 Z M80 55 C70 55 60 64 60 75 C60 86 70 95 80 95 C90 95 100 86 100 75 C100 64 90 55 80 55 Z" fill="#F26A5A"/>
+      <circle cx="80" cy="75" r="15" fill="white"/>
+      
+      <!-- Connection dot on left -->
+      <circle cx="30" cy="75" r="8" fill="#F26A5A"/>
+      
+      <!-- Connection path -->
+      <path d="M30 75 L50 75" stroke="#F26A5A" stroke-width="8" stroke-linecap="round"/>
+    </g>
+    
+    <!-- Text "SambaConnect" -->
+    <g id="text">
+      <text x="140" y="85" font-family="Arial, sans-serif" font-weight="700" font-size="38" fill="#323E66">Samba</text>
+      <text x="270" y="85" font-family="Arial, sans-serif" font-weight="700" font-size="38" fill="#F26A5A">Connect</text>
+    </g>
+    
+    <!-- Subtitle with position adjusted slightly left -->
+    <text x="144" y="105" font-family="Arial, sans-serif" font-size="14" fill="#323E66" letter-spacing="1.0">Meeting Scheduling with Digital Samba</text>
+  </g>
+  
+  <!-- Decorative elements -->
+  <rect x="140" y="90" width="130" height="2" fill="#F26A5A"/>
+</svg>

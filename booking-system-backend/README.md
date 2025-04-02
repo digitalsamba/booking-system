@@ -4,6 +4,19 @@
 
 This backend API provides a complete solution for managing bookings, users, availability, and integrating with Digital Samba for video conferencing. It's built with PHP and uses MongoDB as the database backend.
 
+## Features
+- User authentication with JWT
+- Profile management
+- Booking creation and management
+- Service provider availability management
+  - Generate time slots with customizable parameters
+  - Bulk slot generation with date range selection
+  - Daily time slot configuration
+  - Flexible slot duration options
+  - Day of week selection
+  - Individual and bulk slot deletion
+- Integration with Digital Samba for video conferencing
+
 ## Table of Contents
 
 - [Installation](#installation)
@@ -167,7 +180,11 @@ For detailed documentation on the Digital Samba integration, see [docs/digital-s
 - `POST /availability/generate` - Generate availability slots based on a template
 - `GET /availability/:id` - Get availability slot details
 - `PUT /availability/:id` - Update availability
-- `DELETE /availability/:id` - Remove availability slot
+- `DELETE /availability/deleteSlot?id={slot_id}` - Remove availability slot (Note: Uses query parameter format)
+
+> **⚠️ Important Note on API Implementation**: While the API follows REST naming conventions for most endpoints, 
+> the delete availability endpoint specifically requires using the query parameter format 
+> (`/availability/deleteSlot?id={slot_id}`) rather than the path parameter format.
 
 #### Generate Availability Slots
 
@@ -233,3 +250,37 @@ Common error codes:
 - `UNAUTHORIZED` - Authentication required
 - `FORBIDDEN` - Insufficient permissions
 - `INTERNAL_ERROR` - Server error
+
+## Recent Updates
+- Added duplicate slot checking in availability generation
+- Improved date handling and timezone management
+- Enhanced error logging and debugging
+- Added bulk slot deletion endpoint
+- Improved MongoDB query optimization
+- Added validation for slot generation parameters
+- Enhanced error messages and response formatting
+
+## Development
+- PHP 8.1 or higher
+- MongoDB 4.4 or higher
+- Composer for dependency management
+- JWT for authentication
+
+## Testing
+```bash
+# Run syntax check
+php syntax_check.php
+
+# Test MongoDB connection
+php mongodb_check.php
+
+# Test API endpoints
+php api_test.php
+```
+
+## Security
+- JWT token-based authentication
+- Input validation and sanitization
+- MongoDB injection prevention
+- CORS configuration
+- Rate limiting

@@ -4,8 +4,6 @@
       <AppLogo :logoUrl="logoUrl" />
     </div>
     
-    <h1>Login</h1>
-    
     <div v-if="authStore.error" class="alert alert-error">
       {{ authStore.error }}
     </div>
@@ -93,25 +91,22 @@ export default {
 .login {
   max-width: 500px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem 2rem;
   font-family: 'Inter', sans-serif;
 }
 
 .logo-container {
   display: flex;
   justify-content: center;
-  margin-bottom: 2rem;
-}
-
-.login h1 {
-  font-family: 'Inter', sans-serif;
-  font-weight: 600;
-  text-align: center;
-  color: var(--secondary-color);
+  align-items: center;
+  margin-bottom: 0.5rem;
+  width: 100%;
+  min-height: 140px;
+  padding: 0.5rem 0;
 }
 
 .login-form {
-  margin-top: 2rem;
+  margin-top: 0.5rem;
   background: white;
   padding: 2rem;
   border-radius: 8px;
