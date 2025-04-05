@@ -11,9 +11,11 @@ use App\Models\BookingModel;
 use App\Models\AvailabilityModel;
 use App\Utils\Response;
 use App\Utils\JwtAuth; // Change this from JwtUtil to JwtAuth
+use App\Utils\Email\EmailNotificationService;
 
 class BookingController extends BaseController {
     private $bookingModel;
+    private $emailService;
     protected $userId;
     protected $userRole;
     
@@ -22,6 +24,7 @@ class BookingController extends BaseController {
      */
     public function __construct() {
         $this->bookingModel = new BookingModel();
+        $this->emailService = new EmailNotificationService();
     }
     
     /**
@@ -69,6 +72,18 @@ class BookingController extends BaseController {
             } catch (\Exception $e) {
                 error_log("Failed to generate meeting links: " . $e->getMessage());
                 // Continue without links
+            }
+            
+            // Send email notifications
+            try {
+                // Send confirmation to customer
+                $this->emailService->sendBookingConfirmation($bookingId);
+                
+                // Send notification to provider
+                $this->emailService->sendBookingNotification($bookingId);
+            } catch (\Exception $e) {
+                error_log("Failed to send email notifications: " . $e->getMessage());
+                // Continue without sending emails
             }
             
             Response::json([
@@ -215,10 +230,21 @@ class BookingController extends BaseController {
             return;
         }
         
+        // Store booking data before cancelling
+        $bookingData = $booking;
+        
         // Cancel booking
         $success = $this->bookingModel->cancelBooking($id);
         
         if ($success) {
+            // Send cancellation email
+            try {
+                $this->emailService->sendBookingCancellation($id, $bookingData);
+            } catch (\Exception $e) {
+                error_log("Failed to send cancellation email: " . $e->getMessage());
+                // Continue without sending email
+            }
+            
             Response::json([
                 'success' => true,
                 'message' => 'Booking cancelled successfully'

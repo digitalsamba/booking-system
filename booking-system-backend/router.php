@@ -3,10 +3,74 @@
  * Simple router for PHP's built-in server
  */
 
-// Enable error display for debugging
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// Load environment configuration
+require_once __DIR__ . '/bootstrap.php';
+
+// Set up error handling
+if (DEBUG) {
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+    error_reporting(E_ALL);
+} else {
+    ini_set('display_errors', 0);
+    error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED & ~E_STRICT & ~E_WARNING);
+}
+
+// Parse the URL
+$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$uri = urldecode($uri);
+
+// Routes
+$routes = [
+    '/api/bookings' => 'BookingController',
+    '/api/services' => 'ServiceController',
+    '/api/availability' => 'AvailabilityController',
+    '/api/auth' => 'AuthController',
+    '/api/users' => 'UserController',
+    // Add more routes as needed
+];
+
+// Default response for undefined routes
+$response = [
+    'status' => 404,
+    'message' => 'Not found'
+];
+
+// API prefix for all endpoints
+$apiPrefix = '/api';
+
+// Check if the URI starts with the API prefix
+if (strpos($uri, $apiPrefix) === 0) {
+    // Find matching route
+    foreach ($routes as $route => $controller) {
+        if (strpos($uri, $route) === 0) {
+            // Load controller
+            $controllerFile = __DIR__ . '/src/Controllers/' . $controller . '.php';
+            if (file_exists($controllerFile)) {
+                require_once $controllerFile;
+                
+                // Extract class name from namespace
+                $controllerClass = '\\App\\Controllers\\' . $controller;
+                
+                // Create controller instance
+                $controllerInstance = new $controllerClass();
+                
+                // Handle the request
+                $response = $controllerInstance->handleRequest($uri);
+                break;
+            }
+        }
+    }
+}
+
+// Set content type to JSON
+header('Content-Type: application/json');
+
+// Set status code
+http_response_code($response['status'] ?? 200);
+
+// Output response
+echo json_encode($response);
 
 // Handle OPTIONS preflight request
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -19,27 +83,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     // Return 200 OK with no content
     http_response_code(200);
     exit;
-}
-
-// IMPORTANT: Load Composer autoloader at the very beginning
-$autoloadPath = __DIR__ . '/vendor/autoload.php';
-if (file_exists($autoloadPath)) {
-    require_once $autoloadPath;
-} else {
-    die("Composer autoloader not found. Please run 'composer install'");
-}
-
-// Define base paths only if not defined yet
-if (!defined('BASE_PATH')) {
-    define('BASE_PATH', __DIR__);
-}
-
-if (!defined('CONFIG_PATH')) {
-    define('CONFIG_PATH', BASE_PATH . DIRECTORY_SEPARATOR . 'config');
-}
-
-if (!defined('SRC_PATH')) {
-    define('SRC_PATH', BASE_PATH . DIRECTORY_SEPARATOR . 'src');
 }
 
 // Log incoming request for debugging
@@ -199,6 +242,32 @@ if (preg_match('#^booking/([^/]+)/meeting-links$#', $uri, $matches)) {
             'error' => 'Failed to process request: ' . $e->getMessage()
         ]);
     }
+    exit;
+}
+
+// Email configuration routes
+if (preg_match('#^email/config$#', $uri)) {
+    $controller = new \App\Controllers\EmailController();
+    
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        $controller->getEmailConfig();
+    } else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $controller->saveEmailConfig();
+    } else if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+        $controller->resetEmailConfig();
+    }
+    exit;
+}
+
+if (preg_match('#^email/providers$#', $uri)) {
+    $controller = new \App\Controllers\EmailController();
+    $controller->getSupportedProviders();
+    exit;
+}
+
+if (preg_match('#^email/test$#', $uri)) {
+    $controller = new \App\Controllers\EmailController();
+    $controller->sendTestEmail();
     exit;
 }
 
