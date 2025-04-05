@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Confirmation</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -9,41 +11,60 @@
             color: #333;
             max-width: 600px;
             margin: 0 auto;
+            padding: 20px;
         }
         .header {
-            background-color: #3f51b5;
-            color: white;
-            padding: 20px;
             text-align: center;
+            margin-bottom: 30px;
         }
-        .content {
-            padding: 20px;
+        .logo {
+            max-width: 150px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #4a6cf7;
+            margin-bottom: 20px;
         }
         .booking-details {
-            background-color: #f5f5f5;
-            border-left: 4px solid #3f51b5;
+            background-color: #f9f9f9;
+            border-left: 4px solid #4a6cf7;
             padding: 15px;
-            margin: 20px 0;
+            margin-bottom: 20px;
         }
-        .meeting-link {
-            background-color: #e8f5e9;
-            border-left: 4px solid #4caf50;
-            padding: 15px;
-            margin: 20px 0;
+        .booking-details h2 {
+            margin-top: 0;
+            color: #4a6cf7;
+        }
+        .booking-item {
+            margin-bottom: 10px;
+        }
+        .booking-label {
+            font-weight: bold;
         }
         .notes {
-            background-color: #fff8e1;
-            border-left: 4px solid #ffc107;
+            background-color: #f9f9f9;
             padding: 15px;
-            margin: 20px 0;
+            margin-bottom: 20px;
+            border-left: 4px solid #e0e0e0;
+        }
+        .join-button {
+            display: inline-block;
+            background-color: #4a6cf7;
+            color: white !important;
+            text-decoration: none;
+            padding: 12px 25px;
+            border-radius: 4px;
+            margin-top: 15px;
+            margin-bottom: 15px;
+            font-weight: bold;
         }
         .footer {
             margin-top: 30px;
-            padding-top: 15px;
-            border-top: 1px solid #eee;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
             text-align: center;
-            font-size: 0.9em;
-            color: #777;
+            font-size: 12px;
+            color: #666;
         }
     </style>
 </head>
@@ -51,44 +72,47 @@
     <div class="header">
         <h1>Booking Confirmation</h1>
     </div>
+
+    <p>Dear <?php echo htmlspecialchars($customer_name); ?>,</p>
     
-    <div class="content">
-        <p>Dear <strong><?php echo htmlspecialchars($customer_name); ?></strong>,</p>
-        
-        <p>Your booking with <strong><?php echo htmlspecialchars($provider_name); ?></strong> has been confirmed.</p>
-        
-        <div class="booking-details">
-            <h2>Booking Details</h2>
-            <p><strong>Date:</strong> <?php echo htmlspecialchars($booking_date); ?></p>
-            <p><strong>Time:</strong> <?php echo htmlspecialchars($start_time); ?> - <?php echo htmlspecialchars($end_time); ?></p>
-            <p><strong>Booking ID:</strong> <?php echo htmlspecialchars($booking_id); ?></p>
+    <p>Your booking with <?php echo htmlspecialchars($provider_name); ?> has been confirmed.</p>
+    
+    <div class="booking-details">
+        <h2>Booking Details</h2>
+        <div class="booking-item">
+            <span class="booking-label">Date:</span> <?php echo htmlspecialchars($booking_date); ?>
+        </div>
+        <div class="booking-item">
+            <span class="booking-label">Time:</span> <?php echo htmlspecialchars($start_time); ?> - <?php echo htmlspecialchars($end_time); ?>
+        </div>
+        <div class="booking-item">
+            <span class="booking-label">Booking ID:</span> <?php echo htmlspecialchars($booking_id); ?>
         </div>
         
         <?php if (!empty($customer_link)): ?>
-        <div class="meeting-link">
-            <h2>Virtual Meeting</h2>
-            <p><a href="<?php echo htmlspecialchars($customer_link); ?>" target="_blank">Click here to join the meeting</a></p>
-            <p><small>(This link will be active at the time of your appointment)</small></p>
+        <div class="booking-item">
+            <span class="booking-label">Meeting Link:</span><br>
+            <a href="<?php echo htmlspecialchars($customer_link); ?>" class="join-button">Join Meeting</a>
         </div>
         <?php endif; ?>
-        
-        <?php if (!empty($notes)): ?>
-        <div class="notes">
-            <h2>Additional Notes</h2>
-            <p><?php echo nl2br(htmlspecialchars($notes)); ?></p>
-        </div>
-        <?php endif; ?>
-        
-        <p>Thank you for using our booking system.</p>
-        
-        <p>
-            Regards,<br>
-            <?php echo htmlspecialchars($company_name); ?>
-        </p>
-        
-        <div class="footer">
-            <p>&copy; <?php echo date('Y'); ?> <?php echo htmlspecialchars($company_name); ?>. All rights reserved.</p>
-        </div>
+    </div>
+    
+    <?php if (!empty($notes)): ?>
+    <div class="notes">
+        <h3>Additional Notes</h3>
+        <p><?php echo nl2br(htmlspecialchars($notes)); ?></p>
+    </div>
+    <?php endif; ?>
+    
+    <p>Please make sure to join the meeting a few minutes before the scheduled time.</p>
+    <p>If you need to cancel or reschedule, please contact us as soon as possible.</p>
+    
+    <p>Thank you for using our booking system.</p>
+    
+    <p>Regards,<br><?php echo htmlspecialchars($company_name); ?></p>
+    
+    <div class="footer">
+        <p>&copy; <?php echo date('Y'); ?> <?php echo htmlspecialchars($company_name); ?>. All rights reserved.</p>
     </div>
 </body>
 </html> 

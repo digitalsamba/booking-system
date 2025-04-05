@@ -16,62 +16,6 @@ if (DEBUG) {
     error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED & ~E_STRICT & ~E_WARNING);
 }
 
-// Parse the URL
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$uri = urldecode($uri);
-
-// Routes
-$routes = [
-    '/api/bookings' => 'BookingController',
-    '/api/services' => 'ServiceController',
-    '/api/availability' => 'AvailabilityController',
-    '/api/auth' => 'AuthController',
-    '/api/users' => 'UserController',
-    // Add more routes as needed
-];
-
-// Default response for undefined routes
-$response = [
-    'status' => 404,
-    'message' => 'Not found'
-];
-
-// API prefix for all endpoints
-$apiPrefix = '/api';
-
-// Check if the URI starts with the API prefix
-if (strpos($uri, $apiPrefix) === 0) {
-    // Find matching route
-    foreach ($routes as $route => $controller) {
-        if (strpos($uri, $route) === 0) {
-            // Load controller
-            $controllerFile = __DIR__ . '/src/Controllers/' . $controller . '.php';
-            if (file_exists($controllerFile)) {
-                require_once $controllerFile;
-                
-                // Extract class name from namespace
-                $controllerClass = '\\App\\Controllers\\' . $controller;
-                
-                // Create controller instance
-                $controllerInstance = new $controllerClass();
-                
-                // Handle the request
-                $response = $controllerInstance->handleRequest($uri);
-                break;
-            }
-        }
-    }
-}
-
-// Set content type to JSON
-header('Content-Type: application/json');
-
-// Set status code
-http_response_code($response['status'] ?? 200);
-
-// Output response
-echo json_encode($response);
-
 // Handle OPTIONS preflight request
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     // Set CORS headers
@@ -88,18 +32,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // Log incoming request for debugging
 error_log("Incoming request: " . $_SERVER['REQUEST_METHOD'] . " " . $_SERVER['REQUEST_URI']);
 
+// Parse the URL
+$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$uri = urldecode($uri);
+$uri = trim($uri, '/');
+
 // Check if the request is for a static file (HTML, CSS, JS, images)
 $staticExtensions = ['html', 'css', 'js', 'png', 'jpg', 'jpeg', 'gif', 'ico', 'svg'];
-$requestPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$extension = pathinfo($requestPath, PATHINFO_EXTENSION);
+$extension = pathinfo($uri, PATHINFO_EXTENSION);
 
 if (in_array($extension, $staticExtensions)) {
     // For static files in /public directory
-    $filePath = __DIR__ . '/public' . $requestPath;
+    $filePath = __DIR__ . '/public/' . $uri;
     
     // If file doesn't exist in /public, try the root directory
     if (!file_exists($filePath)) {
-        $filePath = __DIR__ . $requestPath;
+        $filePath = __DIR__ . '/' . $uri;
     }
     
     // If the file exists, serve it with appropriate content type
@@ -124,9 +72,64 @@ if (in_array($extension, $staticExtensions)) {
     }
 }
 
-// Direct routes for system checks
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$uri = trim($uri, '/');
+// Define API routes using prefix
+$apiPrefix = 'api/';
+$isApiRequest = strpos($uri, $apiPrefix) === 0;
+
+// If it's an API request, handle using the structured controllers
+if ($isApiRequest) {
+    $apiRoutes = [
+        'api/bookings' => 'BookingController',
+        'api/services' => 'ServiceController',
+        'api/availability' => 'AvailabilityController',
+        'api/auth' => 'AuthController',
+        'api/users' => 'UserController',
+        'api/email' => 'EmailController',
+        // Add more routes as needed
+    ];
+    
+    // Find matching route
+    $matchedRoute = false;
+    foreach ($apiRoutes as $route => $controller) {
+        if (strpos($uri, $route) === 0) {
+            // Load controller
+            $controllerFile = __DIR__ . '/src/Controllers/' . $controller . '.php';
+            if (file_exists($controllerFile)) {
+                require_once $controllerFile;
+                
+                // Extract class name from namespace
+                $controllerClass = '\\App\\Controllers\\' . $controller;
+                
+                // Create controller instance
+                $controllerInstance = new $controllerClass();
+                
+                // Handle the request
+                $response = $controllerInstance->handleRequest('/' . $uri);
+                
+                // Set content type to JSON
+                header('Content-Type: application/json');
+                
+                // Set status code
+                http_response_code($response['status'] ?? 200);
+                
+                // Output response
+                echo json_encode($response);
+                exit;
+            }
+        }
+    }
+    
+    // If no matching route found
+    if (!$matchedRoute) {
+        header('Content-Type: application/json');
+        http_response_code(404);
+        echo json_encode([
+            'status' => 404,
+            'message' => 'API endpoint not found'
+        ]);
+        exit;
+    }
+}
 
 // Simple routes for testing API availability
 if ($uri === 'ping' || $uri === 'test') {
@@ -219,7 +222,16 @@ if (preg_match('#^auth/profile$#', $uri)) {
     exit;
 }
 
-// Add these routes right before the "For all other routes..." section
+// User profile management (for frontend compatibility)
+if (preg_match('#^user/profile$#', $uri)) {
+    $controller = new \App\Controllers\AuthController();
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        $controller->getProfile();
+    } else if ($_SERVER['REQUEST_METHOD'] === 'PUT' || $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $controller->updateProfile();
+    }
+    exit;
+}
 
 // Digital Samba meeting links routes
 if (preg_match('#^booking/([^/]+)/meeting-links$#', $uri, $matches)) {
@@ -248,26 +260,11 @@ if (preg_match('#^booking/([^/]+)/meeting-links$#', $uri, $matches)) {
 // Email configuration routes
 if (preg_match('#^email/config$#', $uri)) {
     $controller = new \App\Controllers\EmailController();
-    
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        $controller->getEmailConfig();
+        $controller->getConfig();
     } else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $controller->saveEmailConfig();
-    } else if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-        $controller->resetEmailConfig();
+        $controller->updateConfig();
     }
-    exit;
-}
-
-if (preg_match('#^email/providers$#', $uri)) {
-    $controller = new \App\Controllers\EmailController();
-    $controller->getSupportedProviders();
-    exit;
-}
-
-if (preg_match('#^email/test$#', $uri)) {
-    $controller = new \App\Controllers\EmailController();
-    $controller->sendTestEmail();
     exit;
 }
 

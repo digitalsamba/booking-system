@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { authService } from '../services/api'
+import { authService, userService } from '../services/api'
 
 export const useAuthStore = defineStore('auth', {
   state: () => {
@@ -120,8 +120,8 @@ export const useAuthStore = defineStore('auth', {
       this.error = null
       
       try {
-        // Use the authService directly
-        const response = await authService.updateProfile(userData)
+        // Use the userService instead of authService
+        const response = await userService.updateProfile(userData)
         
         // Log what we received from the server
         console.log('Server response:', response.data.user);

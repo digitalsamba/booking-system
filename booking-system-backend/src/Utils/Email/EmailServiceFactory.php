@@ -24,9 +24,6 @@ class EmailServiceFactory {
             $provider = EmailConfig::get('EMAIL_PROVIDER') ?: 'smtp';
         }
         
-        // Log what provider we're trying to create
-        error_log("EmailServiceFactory: Creating provider '$provider'");
-        
         // Create the appropriate provider
         switch (strtolower($provider)) {
             case 'smtp':
@@ -39,9 +36,7 @@ class EmailServiceFactory {
                 }
                 
                 // Log if we found a SendGrid API key
-                if (isset($config['api_key'])) {
-                    error_log("EmailServiceFactory: SendGrid API key found (length: " . strlen($config['api_key']) . ")");
-                } else {
+                if (!isset($config['api_key'])) {
                     error_log("EmailServiceFactory: SendGrid API key NOT found");
                 }
                 
