@@ -20,6 +20,12 @@ This backend API provides a complete solution for managing bookings, users, avai
 - Rate limiting and security measures
 - Comprehensive error handling
 - Input validation and sanitization
+- Email notification system with multiple provider support
+  - SMTP servers
+  - SendGrid
+  - Amazon SES
+  - Custom provider configurations
+  - Email templates for booking events
 
 ## Table of Contents
 
@@ -38,6 +44,7 @@ This backend API provides a complete solution for managing bookings, users, avai
   - [User Endpoints](#user-endpoints)
 - [Code Style Guidelines](#code-style-guidelines)
 - [Error Handling](#error-handling)
+- [Email Integration](#email-integration)
 
 ## Installation
 
@@ -300,3 +307,69 @@ php api_test.php
 - Secure password hashing
 - XSS prevention
 - CSRF protection
+
+## Email Integration
+
+The booking system includes email capabilities to send notifications for bookings, reminders, and other communications.
+
+### Email Configuration
+
+Email settings are configured in the `.env` file:
+
+```
+# Email provider (smtp, sendgrid, ses)
+EMAIL_PROVIDER=sendgrid
+
+# Default sender
+EMAIL_FROM=bookings@example.com
+EMAIL_FROM_NAME="Booking System"
+
+# SendGrid settings
+SENDGRID_API_KEY=your_sendgrid_api_key
+
+# SMTP settings
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USERNAME=username
+SMTP_PASSWORD=password
+SMTP_ENCRYPTION=tls
+```
+
+### Email Providers
+
+The system supports multiple email providers:
+
+1. **SMTP** - Standard SMTP server integration
+2. **SendGrid** - SendGrid API integration for high-volume delivery
+3. **Amazon SES** - Amazon Simple Email Service integration
+
+### Using Email in Code
+
+```php
+// Import the factory
+use App\Utils\Email\EmailServiceFactory;
+
+// Create email service (uses provider from .env)
+$emailService = EmailServiceFactory::create();
+
+// Send a simple email
+$success = $emailService->sendEmail(
+    'recipient@example.com',
+    'Booking Confirmation',
+    'Your booking has been confirmed.',
+    '<h1>Booking Confirmed</h1><p>Your booking has been confirmed.</p>'
+);
+
+// Send a template email (SendGrid example)
+$success = $emailService->sendTemplateEmail(
+    'recipient@example.com',
+    'd-template-id-from-sendgrid',
+    [
+        'name' => 'John Doe',
+        'booking_date' => '2023-05-15 14:30',
+        'service' => 'Consultation'
+    ]
+);
+```
+
+For more detailed information about email functionality, see [README-EMAIL.md](README-EMAIL.md).
