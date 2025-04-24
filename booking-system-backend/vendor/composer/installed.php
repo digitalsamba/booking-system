@@ -3,7 +3,7 @@
         'name' => 'ds/booking-system-backend',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '466333b2f1425f06eddc05feec73832ebfe11fa3',
+        'reference' => '1e03d11a4a2df4b711ce869d45833b9e0a1212f6',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -13,7 +13,7 @@
         'ds/booking-system-backend' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '466333b2f1425f06eddc05feec73832ebfe11fa3',
+            'reference' => '1e03d11a4a2df4b711ce869d45833b9e0a1212f6',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

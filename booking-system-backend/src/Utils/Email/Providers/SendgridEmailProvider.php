@@ -20,22 +20,22 @@ class SendgridEmailProvider implements EmailService {
      *
      * @param array $config Configuration options
      */
-    public function __construct(array $config = []) {
-        // Get API key from config or environment
-        $this->apiKey = $config['api_key'] ?? EmailConfig::get('SENDGRID_API_KEY') ?? '';
-        
-        if (empty($this->apiKey)) {
-            error_log("SendgridEmailProvider: No API key provided");
-        } else {
-            error_log("SendgridEmailProvider: API key found (length: " . strlen($this->apiKey) . ")");
+    public function __construct(array $config = [])
+    {
+        // First try to use a provided API key from config
+        if (isset($config['api_key']) && !empty($config['api_key'])) {
+            $this->apiKey = $config['api_key'];
         }
+   
+        // Log debug information
+        error_log("SendgridEmailProvider: Initialized with API key (length: " . strlen($this->apiKey) . ")");
         
         // Check if we should disable SSL verification (for development only)
         $appEnv = EmailConfig::get('APP_ENV', 'production');
         $this->disableSSLVerify = $appEnv === 'development' || $config['disable_ssl_verify'] ?? false;
         
         if ($this->disableSSLVerify) {
-            error_log("SendgridEmailProvider: WARNING - SSL verification disabled for development");
+            error_log("EMAIL DEBUG: WARNING - SSL verification disabled for development");
         }
     }
     
@@ -214,6 +214,7 @@ class SendgridEmailProvider implements EmailService {
      * @inheritDoc
      */
     public function sendEmail(string $to, string $subject, string $textBody, ?string $htmlBody = null, ?string $from = null, ?string $fromName = null, ?string $replyTo = null, array $attachments = []): bool {
+        
         // Create options array
         $options = [];
         if ($from) $options['from_email'] = $from;
@@ -246,48 +247,78 @@ class SendgridEmailProvider implements EmailService {
      */
     private function sendApiRequest(array $data): bool {
         try {
+            // Log important parts of the request data - Keep this one
+            $to = $data['personalizations'][0]['to'][0]['email'] ?? 'unknown';
+            $subject = $data['personalizations'][0]['subject'] ?? 'No subject';
+            error_log("SendgridEmailProvider: Sending to: {$to}, Subject: {$subject}");
+            
             // Initialize cURL
             $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, 'https://api.sendgrid.com/v3/mail/send');
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: Bearer ' . $this->apiKey,
-                'Content-Type: application/json'
-            ]);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            
-            // Disable SSL verification for development if needed
-            if ($this->disableSSLVerify) {
-                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+            if (!$ch) {
+                error_log("SendgridEmailProvider: CRITICAL ERROR - curl_init() failed!");
+                return false;
             }
             
-            // Execute request
-            $response = curl_exec($ch);
-            $info = curl_getinfo($ch);
-            $httpCode = $info['http_code'];
-            
-            if (curl_errno($ch)) {
-                error_log("SendgridEmailProvider: cURL error: " . curl_error($ch));
+            // Set options
+            $curlOptions = [
+                CURLOPT_URL => 'https://api.sendgrid.com/v3/mail/send',
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($data),
+                CURLOPT_HTTPHEADER => [
+                    'Authorization: Bearer ' . $this->apiKey,
+                    'Content-Type: application/json'
+                ],
+                CURLOPT_SSL_VERIFYPEER => !$this->disableSSLVerify,
+                CURLOPT_SSL_VERIFYHOST => $this->disableSSLVerify ? 0 : 2
+            ];
+            $setoptResult = curl_setopt_array($ch, $curlOptions);
+            if (!$setoptResult) {
+                error_log("SendgridEmailProvider: CRITICAL ERROR - curl_setopt_array() failed!");
                 curl_close($ch);
                 return false;
             }
             
-            curl_close($ch);
+            // Execute request
+            $response = curl_exec($ch);
             
-            // Check for success (2xx status code)
-            $success = $httpCode >= 200 && $httpCode < 300;
-            
-            if (!$success) {
-                error_log("SendgridEmailProvider: API error (HTTP $httpCode): " . $response);
-            } else {
-                error_log("SendgridEmailProvider: Email sent successfully (HTTP $httpCode)");
+            // Check for cURL errors immediately after execution
+            if (curl_errno($ch)) {
+                $curlError = curl_error($ch);
+                error_log("SendgridEmailProvider: CRITICAL cURL Error after exec: {$curlError}");
+                curl_close($ch);
+                return false;
             }
             
-            return $success;
-        } catch (\Exception $e) {
-            error_log("SendgridEmailProvider: Exception: " . $e->getMessage());
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            
+            // Close cURL handle
+            curl_close($ch);
+            
+            // Log the result
+            if ($httpCode >= 200 && $httpCode < 300) {
+                error_log("SendgridEmailProvider: Email sent successfully (HTTP {$httpCode})");
+                return true;
+            } else {
+                error_log("SendgridEmailProvider: FAILED to send email (HTTP {$httpCode})");
+                if ($response) {
+                    error_log("SendgridEmailProvider: API response: {$response}");
+                }
+                $jsonResponse = json_decode($response, true);
+                if ($jsonResponse && isset($jsonResponse['errors'])) {
+                    foreach ($jsonResponse['errors'] as $err) {
+                        error_log("SendgridEmailProvider: SendGrid error: " . json_encode($err));
+                    }
+                }
+                return false;
+            }
+            
+        } catch (\Throwable $e) { 
+            error_log("SendgridEmailProvider: FATAL Exception/Error: " . $e->getMessage());
+            error_log("SendgridEmailProvider: Trace: " . $e->getTraceAsString());
+            if (isset($ch) && is_resource($ch)) {
+                curl_close($ch);
+            }
             return false;
         }
     }
@@ -308,5 +339,14 @@ class SendgridEmailProvider implements EmailService {
      */
     public function isConfigured(): bool {
         return !empty($this->apiKey);
+    }
+    
+    /**
+     * Get the API key (for testing purposes only)
+     * 
+     * @return string The API key
+     */
+    public function getApiKey(): string {
+        return $this->apiKey ?? '';
     }
 } 

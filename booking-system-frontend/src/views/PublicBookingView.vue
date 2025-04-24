@@ -261,6 +261,7 @@ export default {
             })
             .map(slot => ({
               id: slot.id,
+              original_id: slot._id || slot.id, // Keep the original MongoDB ID
               startTime: new Date(slot.start_time),
               endTime: new Date(slot.end_time),
               isBooked: !slot.is_available
@@ -299,6 +300,14 @@ export default {
       success.value = null
       
       try {
+        console.log('Submitting booking with data:', {
+          username: route.params.username,
+          bookingData: {
+            ...bookingForm.value,
+            slot: selectedSlot.value
+          }
+        })
+        
         const response = await publicBookingService.createBooking(
           route.params.username,
           {
@@ -307,7 +316,9 @@ export default {
           }
         )
         
-        success.value = 'Booking created successfully! You will receive a confirmation email shortly.'
+        console.log('Booking response:', response.data)
+        
+        success.value = 'Booking created successfully! You will receive a confirmation email shortly with your meeting link.'
         
         // Clear form and selection
         bookingForm.value = {
@@ -321,7 +332,8 @@ export default {
         await loadAvailableSlots()
       } catch (err) {
         console.error('Booking failed:', err)
-        error.value = err.message || 'Unable to create booking. Please try again.'
+        const errorMessage = err.response?.data?.error || err.message || 'Unable to create booking. Please try again.'
+        error.value = errorMessage
       } finally {
         isSubmitting.value = false
       }

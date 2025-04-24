@@ -79,16 +79,35 @@ export const publicBookingService = {
       }
     })
   },
-  createBooking: (username, data) => 
-    api.post('/public/booking', {
+  createBooking: (username, data) => {
+    if (!data.slot) {
+      console.error('Missing slot data!', data);
+      return Promise.reject(new Error('Booking requires a valid slot selection'));
+    }
+    
+    // Use original_id if available, otherwise fall back to id
+    const slotId = data.slot.original_id || data.slot.id;
+    
+    if (!slotId) {
+      console.error('Missing slot ID!', data.slot);
+      return Promise.reject(new Error('Booking requires a valid slot ID'));
+    }
+    
+    // Ensure data is properly formatted
+    const bookingData = {
       provider_username: username,
-      slot_id: data.slot.id,
+      slot_id: slotId,
       customer: {
         name: data.name,
         email: data.email
       },
-      notes: data.notes
-    })
+      notes: data.notes || ''
+    };
+    
+    console.log('Creating booking with formatted data:', bookingData);
+    
+    return api.post('/public/booking', bookingData);
+  }
 }
 
 export default api

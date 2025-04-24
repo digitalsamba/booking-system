@@ -57,6 +57,16 @@
             margin-top: 15px;
             margin-bottom: 15px;
             font-weight: bold;
+            text-align: center;
+            width: 200px;
+            font-size: 16px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .join-button:hover {
+            background-color: #3a5ce6;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
         .footer {
             margin-top: 30px;
@@ -93,6 +103,9 @@
         <div class="booking-item">
             <span class="booking-label">Meeting Link:</span><br>
             <a href="<?php echo htmlspecialchars($customer_link); ?>" class="join-button">Join Meeting</a>
+            <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                Save this link to join your meeting at the scheduled time. You can also bookmark it for easy access.
+            </p>
         </div>
         <?php endif; ?>
     </div>

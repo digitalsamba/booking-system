@@ -10,6 +10,7 @@ namespace App\Controllers;
 use App\Models\UserModel;
 use App\Models\AvailabilityModel;
 use App\Models\BookingModel; // Correct import for BookingModel
+// We don't need a separate ProviderModel import - UserModel already imported // Import ProviderModel
 use App\Utils\Response;
 use App\Utils\Email\EmailServiceFactory;
 use MongoDB\BSON\ObjectId;
@@ -18,11 +19,13 @@ class PublicController extends BaseController {
     private $userModel;
     private $availabilityModel;
     private $bookingModel;
+    // We don't need a separate providerModel property - userModel is sufficient
     
     public function __construct() {
         $this->userModel = new UserModel();
         $this->availabilityModel = new AvailabilityModel();
         $this->bookingModel = new BookingModel(); // Initialize BookingModel properly
+        // No need to initialize ProviderModel - userModel is already initialized
         error_log("PUBLIC CONTROLLER: Constructor initialized with all models");
     }
     
@@ -98,10 +101,22 @@ class PublicController extends BaseController {
         $data = $this->getJsonData();
         error_log("BOOKING DEBUG: Received booking data: " . json_encode($data));
         
-        // Validate required fields
-        if (empty($data['slot_id']) || empty($data['provider_username']) || empty($data['customer'])) {
-            error_log("BOOKING ERROR: Missing required fields in booking request");
-            Response::json(['error' => 'Missing required fields'], 400);
+        // Validate required fields and format check
+        if (empty($data['slot_id'])) {
+            error_log("BOOKING ERROR: Missing slot_id in request: " . json_encode($data));
+            Response::json(['error' => 'Missing slot_id'], 400);
+            return;
+        }
+        
+        if (empty($data['provider_username'])) {
+            error_log("BOOKING ERROR: Missing provider_username in request: " . json_encode($data));
+            Response::json(['error' => 'Missing provider_username'], 400);
+            return;
+        }
+        
+        if (empty($data['customer'])) {
+            error_log("BOOKING ERROR: Missing customer data in request: " . json_encode($data));
+            Response::json(['error' => 'Missing customer data'], 400);
             return;
         }
         
@@ -145,6 +160,9 @@ class PublicController extends BaseController {
             return;
         }
         
+        // Log slot data for debugging
+        error_log("BOOKING DEBUG: Slot data: " . json_encode($slot));
+        
         // Create the booking
         $bookingData = [
             'provider_id' => $providerId,
@@ -171,28 +189,133 @@ class PublicController extends BaseController {
             error_log("BOOKING DEBUG: After booking, slot availability status: " . 
                 (isset($updatedSlot['is_available']) ? ($updatedSlot['is_available'] ? 'true' : 'false') : 'unknown'));
             
+            // ======= RE-ENABLING DIGITAL SAMBA INTEGRATION =======
+            // Generate meeting links if the provider has Digital Samba credentials
+            $meetingLinks = null;
+            $bookingId = isset($booking['_id']) ? (string)$booking['_id'] : null;
+            $customerLink = ''; // Initialize customerLink
+            
+            if ($bookingId && isset($provider['team_id']) && !empty($provider['team_id']) && 
+                isset($provider['developer_key']) && !empty($provider['developer_key'])) {
+                
+                // Ensure models are available - PublicController should have them initialized
+                if (!isset($this->bookingModel) || !isset($this->userModel)) {
+                    error_log("FATAL ERROR PREVENTED: BookingModel or UserModel not initialized in PublicController");
+                    throw new \Exception("Required models not available in PublicController");
+                }
+
+                // Instantiate controller BEFORE the try block
+                $digitalSambaController = new \App\Controllers\DigitalSambaController(
+                    $this->bookingModel, 
+                    $this->userModel
+                ); 
+                error_log("BOOKING DEBUG: Instantiated DigitalSambaController outside try block");
+
+                try {
+                    error_log("BOOKING DEBUG: Attempting to call generateMeetingLinks for booking ID: $bookingId");
+                    // Call method inside the try block
+                    $meetingLinksResponse = $digitalSambaController->generateMeetingLinks($bookingId); 
+                    error_log("BOOKING DEBUG: Returned from Digital Samba link generation. Response structure: " . json_encode(array_keys($meetingLinksResponse ?? [])));
+                    
+                    // Check if link generation was successful and extract the link
+                    $providerLink = null; // Initialize provider link
+                    if (isset($meetingLinksResponse['success']) && $meetingLinksResponse['success'] === true) {
+                        if (isset($meetingLinksResponse['links']['customer_link'])) {
+                            $customerLink = $meetingLinksResponse['links']['customer_link'];
+                            error_log("BOOKING DEBUG: Extracted customer link from successful DS response: " . substr($customerLink, 0, 30) . "...");
+                        }
+                        if (isset($meetingLinksResponse['links']['provider_link'])) {
+                            $providerLink = $meetingLinksResponse['links']['provider_link']; // Extract provider link
+                            error_log("BOOKING DEBUG: Extracted provider link from successful DS response: " . substr($providerLink, 0, 30) . "...");
+                        }
+                    } else {
+                        error_log("BOOKING WARNING: Digital Samba link generation did not return a success status or links. Error: " . ($meetingLinksResponse['error'] ?? 'Unknown error'));
+                    }
+                } catch (\Throwable $e) { // Catch Throwable for potentially fatal errors
+                    error_log("BOOKING ERROR: Throwable caught during Digital Samba link generation: " . $e->getMessage());
+                    error_log("BOOKING ERROR: Trace: " . $e->getTraceAsString());
+                    error_log("BOOKING INFO: Continuing with booking process despite meeting link failure");
+                }
+            } else {
+                 // Add logging if the condition fails
+                 error_log("BOOKING DEBUG: Skipping Digital Samba link generation (missing bookingId or provider credentials).");
+                 // Keep minimal reason logging for troubleshooting
+                 // if (!$bookingId) error_log("Reason: bookingId is missing or null."); 
+                 // if (!isset($provider['team_id']) || empty($provider['team_id'])) error_log("Reason: Provider team_id is missing.");
+                 // if (!isset($provider['developer_key']) || empty($provider['developer_key'])) error_log("Reason: Provider developer_key is missing.");
+            }
+            // ======= END RE-ENABLING DIGITAL SAMBA INTEGRATION =======
+
             // Send confirmation email to customer
+            $emailSentSuccessfully = false;
+            error_log("BOOKING EMAIL: ======= INITIATING EMAIL SENDING PROCESS =======");
+            // error_log("BOOKING EMAIL: Booking created successfully, now sending confirmation email"); // Redundant
+            
             try {
-                $this->sendBookingConfirmationEmail(
-                    $data['customer']['email'],
-                    $data['customer']['name'],
-                    $provider['display_name'] ?? $provider['username'],
-                    [
+                // Verify all data needed for email is available
+                if (empty($data['customer']['email'])) {
+                    error_log("BOOKING EMAIL ERROR: Customer email is missing, cannot send confirmation");
+                } else {
+                    // error_log("BOOKING EMAIL: Recipient email: " . $data['customer']['email']); // Too verbose
+                    // error_log("BOOKING EMAIL: Recipient name: " . $data['customer']['name']); // Too verbose
+                    // error_log("BOOKING EMAIL: Provider name: " . ($provider['display_name'] ?? $provider['username'])); // Too verbose
+                    // error_log("BOOKING EMAIL: Booking date: " . date('l, F j, Y', strtotime($slot['start_time']))); // Too verbose
+                    
+                    // Create email data array
+                    $emailData = [
                         'booking_date' => date('l, F j, Y', strtotime($slot['start_time'])),
                         'start_time' => date('g:i A', strtotime($slot['start_time'])),
                         'end_time' => date('g:i A', strtotime($slot['end_time'])),
                         'booking_id' => isset($booking['_id']) ? (string)$booking['_id'] : 'N/A',
                         'notes' => $data['notes'] ?? '',
-                        'customer_link' => isset($booking['customer_link']) ? $booking['customer_link'] : '',
+                        'customer_link' => $customerLink,
                         'company_name' => 'SambaConnect'
-                    ]
-                );
-                error_log("BOOKING EMAIL: Confirmation email sent to " . $data['customer']['email']);
+                    ];
+                    
+                    // error_log("BOOKING EMAIL: *** PRE-CALL *** About to call sendBookingConfirmationEmail method"); // Debug log
+                    
+                    // Call the email sending method
+                    $emailResult = $this->sendBookingConfirmationEmail(
+                        $data['customer']['email'],
+                        $data['customer']['name'],
+                        $provider['display_name'] ?? $provider['username'],
+                        $emailData
+                    );
+                    // error_log("BOOKING EMAIL: *** POST-CALL *** Returned from sendBookingConfirmationEmail method"); // Debug log
+                    
+                    // error_log("BOOKING EMAIL: Email sending result: " . ($emailResult ? "SUCCESS" : "FAILED")); // Redundant
+                    // error_log("BOOKING EMAIL: ======= EMAIL SENDING PROCESS COMPLETE ======="); // Redundant
+                    $emailSentSuccessfully = $emailResult;
+                }
             } catch (\Exception $e) {
-                error_log("BOOKING EMAIL ERROR: Failed to send confirmation email: " . $e->getMessage());
+                error_log("BOOKING EMAIL ERROR: Exception during email sending: " . $e->getMessage());
+                error_log("BOOKING EMAIL ERROR: Exception trace: " . $e->getTraceAsString());
                 // We don't want to fail the booking just because the email failed, so we continue
             }
             
+            // Send notification email to provider
+            try {
+                // Make sure we have the necessary data objects
+                if ($provider && $booking && $slot) {
+                    error_log("BOOKING_PROVIDER_EMAIL: Attempting to send notification to provider: " . ($provider['email'] ?? 'N/A'));
+                    
+                    // Convert BSONDocuments to arrays before passing
+                    $providerArray = (array) $provider;
+                    $bookingArray = (array) $booking;
+                    $slotArray = (array) $slot;
+                    
+                    $this->sendBookingNotificationEmailToProvider($providerArray, $bookingArray, $slotArray, $providerLink);
+                } else {
+                    error_log("BOOKING_PROVIDER_EMAIL ERROR: Missing provider, booking, or slot data. Cannot send notification.");
+                }
+            } catch (\Exception $e) {
+                error_log("BOOKING_PROVIDER_EMAIL ERROR: Exception during provider notification sending: " . $e->getMessage());
+                // Continue even if provider notification fails
+            }
+            
+            // error_log("BOOKING DEBUG: *** CRITICAL POINT 1: About to send response"); // Debug log
+            
+            // Create response with the new booking
             Response::json([
                 'success' => true,
                 'message' => 'Booking created successfully',
@@ -201,6 +324,11 @@ class PublicController extends BaseController {
                 'customer' => $data['customer']['name'],
                 'slot_status' => isset($updatedSlot['is_available']) ? ($updatedSlot['is_available'] ? 'still available (ERROR)' : 'unavailable (OK)') : 'unknown'
             ], 201);
+            
+            // This will never execute if Response::json ends execution
+            error_log("BOOKING DEBUG: *** CRITICAL POINT 2: After response");
+            
+            // Note: This code likely won't be reached if Response::json ends execution
         } else {
             error_log("BOOKING ERROR: Failed to create booking");
             Response::json(['error' => 'Failed to create booking'], 500);
@@ -217,33 +345,52 @@ class PublicController extends BaseController {
      * @return bool Success status
      */
     private function sendBookingConfirmationEmail($email, $name, $providerName, $bookingData) {
+        error_log("BOOKING EMAIL: ====== START BOOKING EMAIL PROCESS ======");
         error_log("BOOKING EMAIL: Sending confirmation email to $name <$email>");
         
         try {
             // Create email service
+            // error_log("BOOKING EMAIL: Creating email service..."); // Too verbose
             $emailService = EmailServiceFactory::create();
+            
+            // Check if the service was created properly
+            if (!$emailService) {
+                error_log("BOOKING EMAIL ERROR: Email service could not be created!");
+                return false;
+            }
+            
+            $emailProviderName = get_class($emailService);
+            error_log("BOOKING EMAIL: Email service created using provider: $emailProviderName");
+            // error_log("BOOKING EMAIL: Email provider configured: " . ($emailService->isConfigured() ? 'YES' : 'NO')); // Keep error case only
+            if (!$emailService->isConfigured()) {
+                error_log("BOOKING EMAIL ERROR: Email provider ($emailProviderName) is NOT configured!");
+                // Depending on requirements, you might want to return false here
+            }
             
             // Prepare template data
             $templateData = [
                 'customer_name' => $name,
-                'provider_name' => $providerName,
+                'provider_name' => $providerName, // This was incorrectly using the provider class name, should use the actual provider name passed in
                 'booking_date' => $bookingData['booking_date'],
                 'start_time' => $bookingData['start_time'],
                 'end_time' => $bookingData['end_time'],
                 'booking_id' => $bookingData['booking_id'],
-                'customer_link' => $bookingData['customer_link'],
-                'notes' => $bookingData['notes'],
-                'company_name' => $bookingData['company_name']
+                'customer_link' => $bookingData['customer_link'] ?? '',
+                'notes' => $bookingData['notes'] ?? '',
+                'company_name' => $bookingData['company_name'] ?? 'SambaConnect'
             ];
             
             // Get template path
             $templateFile = __DIR__ . '/../../templates/emails/booking_confirmation_html.php';
+            // error_log("BOOKING EMAIL: Looking for template at: $templateFile"); // Too verbose
             
             // Check if template exists
             if (!file_exists($templateFile)) {
                 error_log("BOOKING EMAIL ERROR: Template not found at $templateFile");
                 return false;
             }
+            
+            // error_log("BOOKING EMAIL: Template found, rendering email content"); // Too verbose
             
             // Extract data for template
             extract($templateData);
@@ -252,6 +399,8 @@ class PublicController extends BaseController {
             ob_start();
             include $templateFile;
             $htmlBody = ob_get_clean();
+            
+            // error_log("BOOKING EMAIL: HTML template rendered: " . (empty($htmlBody) ? 'EMPTY' : strlen($htmlBody) . ' bytes')); // Too verbose
             
             // Create plain text version
             $textBody = "Booking Confirmation\n\n" .
@@ -274,7 +423,11 @@ class PublicController extends BaseController {
                         "Regards,\n" .
                         $company_name;
             
+            // error_log("BOOKING EMAIL: Text content prepared: " . strlen($textBody) . " bytes"); // Too verbose
+            error_log("BOOKING EMAIL: Attempting to send email via provider $emailProviderName to: $email");
+            
             // Send email
+            // error_log("BOOKING EMAIL: Calling email service sendEmail method..."); // Too verbose
             $success = $emailService->sendEmail(
                 $email,
                 'Your Booking Confirmation',
@@ -283,14 +436,134 @@ class PublicController extends BaseController {
             );
             
             if ($success) {
-                error_log("BOOKING EMAIL: Confirmation email sent successfully to $email");
+                error_log("BOOKING EMAIL: SUCCESS! Confirmation email sent successfully to $email");
+                error_log("BOOKING EMAIL: ====== END BOOKING EMAIL PROCESS ======");
                 return true;
             } else {
-                error_log("BOOKING EMAIL ERROR: Failed to send confirmation email to $email");
+                error_log("BOOKING EMAIL ERROR: FAILED to send confirmation email to $email via $emailProviderName");
+                error_log("BOOKING EMAIL ERROR: Check provider logs for details");
+                error_log("BOOKING EMAIL: ====== END BOOKING EMAIL PROCESS WITH ERRORS ======");
                 return false;
             }
         } catch (\Exception $e) {
-            error_log("BOOKING EMAIL ERROR: " . $e->getMessage());
+            error_log("BOOKING EMAIL ERROR: Exception thrown: " . $e->getMessage());
+            error_log("BOOKING EMAIL ERROR: Exception trace: " . $e->getTraceAsString());
+            error_log("BOOKING EMAIL ERROR: Exception in file: " . $e->getFile() . " on line " . $e->getLine());
+            error_log("BOOKING EMAIL: ====== END BOOKING EMAIL PROCESS WITH EXCEPTION ======");
+            return false;
+        }
+    }
+
+    /**
+     * Send a booking notification email to the provider
+     * 
+     * @param array $provider Provider details
+     * @param array $booking Booking details
+     * @param array $slot Slot details
+     * @param string|null $providerLink Provider's meeting link
+     * @return bool Success status
+     */
+    private function sendBookingNotificationEmailToProvider(array $provider, array $booking, array $slot, ?string $providerLink): bool {
+        $providerEmail = $provider['email'] ?? null;
+        $providerName = $provider['display_name'] ?? $provider['username'] ?? 'Provider';
+        $customerName = $booking['customer']['name'] ?? 'Unknown Customer';
+        $customerEmail = $booking['customer']['email'] ?? 'No email provided';
+
+        if (!$providerEmail) {
+            error_log("BOOKING_PROVIDER_EMAIL ERROR: Provider email is missing for ID: " . ($provider['_id'] ?? 'N/A'));
+            return false;
+        }
+
+        error_log("BOOKING_PROVIDER_EMAIL: ====== START PROVIDER NOTIFICATION PROCESS ======");
+        error_log("BOOKING_PROVIDER_EMAIL: Sending notification to $providerName <$providerEmail> for booking with $customerName");
+
+        try {
+            $emailService = EmailServiceFactory::create();
+            if (!$emailService) {
+                error_log("BOOKING_PROVIDER_EMAIL ERROR: Email service could not be created!");
+                return false;
+            }
+            
+            $emailProviderName = get_class($emailService);
+            error_log("BOOKING_PROVIDER_EMAIL: Email service created using provider: $emailProviderName");
+            if (!$emailService->isConfigured()) {
+                error_log("BOOKING_PROVIDER_EMAIL ERROR: Email provider ($emailProviderName) is NOT configured!");
+                // Potentially return false or use a fallback if critical
+            }
+
+            // Prepare template data
+            $templateData = [
+                'provider_name' => $providerName,
+                'customer_name' => $customerName,
+                'customer_email' => $customerEmail,
+                'booking_date' => date('l, F j, Y', strtotime($slot['start_time'])),
+                'start_time' => date('g:i A', strtotime($slot['start_time'])),
+                'end_time' => date('g:i A', strtotime($slot['end_time'])),
+                'booking_id' => (string)($booking['_id'] ?? 'N/A'),
+                'provider_link' => $providerLink ?? '', // Pass the provider's link
+                'notes' => $booking['notes'] ?? '',
+                'company_name' => 'SambaConnect' // Or use a config value
+            ];
+
+            // Get template path
+            $templateFile = __DIR__ . '/../../templates/emails/booking_notification_provider_html.php';
+
+            if (!file_exists($templateFile)) {
+                error_log("BOOKING_PROVIDER_EMAIL ERROR: Template not found at $templateFile");
+                return false;
+            }
+
+            // Render template
+            extract($templateData);
+            ob_start();
+            include $templateFile;
+            $htmlBody = ob_get_clean();
+
+            // Create plain text version
+            $textBody = "New Booking Notification\n\n" .
+                        "Hello {$provider_name},\n\n" .
+                        "You have a new booking from {$customer_name} ({$customer_email}).\n\n" .
+                        "Booking Details:\n" .
+                        "Date: {$booking_date}\n" .
+                        "Time: {$start_time} - {$end_time}\n" .
+                        "Booking ID: {$booking_id}\n\n";
+            
+            if (!empty($provider_link)) {
+                $textBody .= "Your Meeting Link: {$provider_link}\n\n";
+            }
+            
+            if (!empty($notes)) {
+                $textBody .= "Customer Notes:\n{$notes}\n\n";
+            }
+            
+            $textBody .= "You can view this booking in your dashboard.\n\n" .
+                        "Regards,\n" .
+                        $company_name;
+
+            error_log("BOOKING_PROVIDER_EMAIL: Attempting to send email via provider $emailProviderName to: $providerEmail");
+
+            // Send email
+            $success = $emailService->sendEmail(
+                $providerEmail,
+                "New Booking Notification - {$customer_name} on {$templateData['booking_date']}",
+                $textBody,
+                $htmlBody
+            );
+
+            if ($success) {
+                error_log("BOOKING_PROVIDER_EMAIL: SUCCESS! Notification email sent successfully to $providerEmail");
+                error_log("BOOKING_PROVIDER_EMAIL: ====== END PROVIDER NOTIFICATION PROCESS ======");
+                return true;
+            } else {
+                error_log("BOOKING_PROVIDER_EMAIL ERROR: FAILED to send notification email to $providerEmail via $emailProviderName");
+                error_log("BOOKING_PROVIDER_EMAIL ERROR: Check provider logs for details");
+                error_log("BOOKING_PROVIDER_EMAIL: ====== END PROVIDER NOTIFICATION PROCESS WITH ERRORS ======");
+                return false;
+            }
+        } catch (\Exception $e) {
+            error_log("BOOKING_PROVIDER_EMAIL ERROR: Exception thrown: " . $e->getMessage());
+            error_log("BOOKING_PROVIDER_EMAIL ERROR: Exception trace: " . $e->getTraceAsString());
+            error_log("BOOKING_PROVIDER_EMAIL: ====== END PROVIDER NOTIFICATION PROCESS WITH EXCEPTION ======");
             return false;
         }
     }

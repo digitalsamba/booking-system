@@ -9,12 +9,14 @@ namespace App\Controllers;
 
 use App\Models\BookingModel;
 use App\Models\AvailabilityModel;
+use App\Models\UserModel; // Use UserModel instead of ProviderModel // Added ProviderModel
 use App\Utils\Response;
-use App\Utils\JwtAuth; // Change this from JwtUtil to JwtAuth
+use App\Utils\JwtAuth; 
 use App\Utils\Email\EmailNotificationService;
 
 class BookingController extends BaseController {
     private $bookingModel;
+    private $userModel; // Use UserModel instead of ProviderModel // Added providerModel
     private $emailService;
     protected $userId;
     protected $userRole;
@@ -24,6 +26,7 @@ class BookingController extends BaseController {
      */
     public function __construct() {
         $this->bookingModel = new BookingModel();
+        $this->userModel = new UserModel(); // Initialize UserModel // Instantiate providerModel
         $this->emailService = new EmailNotificationService();
     }
     
@@ -64,17 +67,28 @@ class BookingController extends BaseController {
             
             // Generate meeting links
             try {
-                $digitalSambaController = new \App\Controllers\DigitalSambaController();
+                // Pass the required models to the constructor
+                $digitalSambaController = new \App\Controllers\DigitalSambaController(
+                    $this->bookingModel, 
+                    $this->userModel
+                ); 
+                error_log("BookingController: Instantiated DigitalSambaController with models");
                 $digitalSambaController->generateMeetingLinks($bookingId);
+                error_log("BookingController: Returned from generateMeetingLinks for booking ID: " . $bookingId);
                 
                 // Refresh booking data to include links
+                error_log("BookingController: Attempting to refresh booking data with ID: " . $bookingId);
                 $booking = $this->bookingModel->getById($bookingId);
+                error_log("BookingController: Successfully refreshed booking data for ID: " . $bookingId);
+
             } catch (\Exception $e) {
-                error_log("Failed to generate meeting links: " . $e->getMessage());
+                error_log("BookingController: EXCEPTION during meeting link generation/refresh: " . $e->getMessage());
+                error_log("BookingController: Stack Trace: " . $e->getTraceAsString());
                 // Continue without links
             }
             
             // Send email notifications
+            error_log("BookingController: Proceeding to send email notifications for booking ID: " . $bookingId);
             try {
                 // Send confirmation to customer
                 $this->emailService->sendBookingConfirmation($bookingId);
