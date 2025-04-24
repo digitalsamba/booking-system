@@ -147,7 +147,7 @@ Email templates are located in the `templates/emails/` directory:
 
 Available templates:
 - `booking_confirmation`: Sent to customers when a booking is created
-- `booking_notification`: Sent to providers when a booking is created
+- `booking_notification_provider`: Sent to providers when a booking is created
 - `booking_reminder`: Sent to customers before a scheduled booking
 - `booking_cancellation`: Sent to customers when a booking is cancelled
 
@@ -171,19 +171,25 @@ The email system uses:
 ### Common Issues
 
 1. **Emails not sending**:
-   - Check your email provider configuration
-   - Verify SMTP credentials or API keys
-   - Check server logs for error messages
+   - Check your email provider configuration in the `.env` file or the provider-specific settings via the API.
+   - Verify SMTP credentials or API keys are correct and active.
+   - Check server logs (`logs/app.log` and potentially PHP/web server error logs) for error messages from the `EmailService` or specific providers (e.g., `SendgridEmailProvider`).
 
 2. **Templates not loading**:
-   - Ensure template files exist in the correct location
-   - Check file permissions
+   - Ensure template files (e.g., `booking_confirmation_html.php`, `booking_notification_provider_html.php`) exist in the `templates/emails/` directory.
+   - Check file permissions for the template files.
 
 3. **Slow email sending**:
-   - Consider using an API-based provider like SendGrid for better performance
-   - For SMTP, check your server's connection to the SMTP server
+   - Consider using an API-based provider like SendGrid for better performance compared to some SMTP servers.
+   - For SMTP, check your server's network connection and latency to the configured SMTP host.
 
 4. **Email going to spam**:
-   - Set up proper SPF, DKIM, and DMARC records for your domain
-   - Use a reputable email service provider
-   - Avoid spam trigger words in subject lines and content 
+   - Set up proper SPF, DKIM, and DMARC records for the sending domain (`EMAIL_FROM`).
+   - Use a reputable email service provider (SendGrid, SES often have better deliverability than basic SMTP).
+   - Ensure email content doesn't contain common spam trigger words or excessive formatting.
+
+5. **SSL/TLS Connection Errors (cURL)**:
+   - **Issue:** When using API-based providers (SendGrid, potentially SES or custom ones using cURL) in certain environments (especially local Windows development), you might encounter SSL certificate verification errors (e.g., `unable to get local issuer certificate`).
+   - **Troubleshooting:** This often happens if the PHP/cURL installation doesn't have access to an up-to-date Certificate Authority (CA) bundle.
+   - **Development Fix (Temporary):** For local development *only*, SSL verification has been temporarily disabled in the `apiRequest` method of `DigitalSambaController.php` and the `sendApiRequest` method of `SendgridEmailProvider.php` using `CURLOPT_SSL_VERIFYPEER => false` and `CURLOPT_SSL_VERIFYHOST => 0`. **This is insecure and should NOT be used in production.**
+   - **Production Fix:** Ensure your server's PHP/cURL installation is configured with a valid CA certificate bundle. You can often specify the path to a `cacert.pem` file in your `php.ini` (`curl.cainfo` setting) or download the latest bundle from the cURL website. 
