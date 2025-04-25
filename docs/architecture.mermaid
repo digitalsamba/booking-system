@@ -1,0 +1,176 @@
+```mermaid
+graph TB
+    subgraph "Frontend Application"
+        VueApp["Vue.js Application"]
+        subgraph "Vue Components"
+            Components["UI Components"]
+            AppLogo["AppLogo.vue"]
+            BookingForm["BookingForm.vue"]
+            BookingCard["BookingCard.vue"]
+            SuccessModal["SuccessModal.vue"]
+        end
+        subgraph "Vue Views"
+            HomeView["HomeView.vue"]
+            LoginView["LoginView.vue"]
+            BookingsView["BookingsView.vue"]
+            AvailabilityView["AvailabilityView.vue"]
+            ProfileView["ProfileView.vue"]
+            PublicBookingView["PublicBookingView.vue"]
+            RegisterView["RegisterView.vue"]
+        end
+        subgraph "State Management"
+            PiniaStore["Pinia Store"]
+            AuthStore["auth.js"]
+            BookingsStore["bookings.js"]
+        end
+        subgraph "Vue Services"
+            API["API Service"]
+            AuthService["Auth Service"]
+            BookingService["Booking Service"]
+            AvailabilityService["Availability Service"]
+            PublicBookingService["Public Booking Service"]
+        end
+    end
+
+    subgraph "Backend API"
+        PHPBackend["PHP Backend"]
+        subgraph "Controllers"
+            AuthController["Auth Controller"]
+            BookingController["Booking Controller"]
+            AvailabilityController["Availability Controller"]
+            UserController["User Controller"]
+            PublicController["Public Controller"]
+            PaymentController["Payment Controller (Planned)"]
+            WidgetController["Widget Controller (Planned)"]
+            BrandingController["Branding Controller (Planned)"]
+        end
+        subgraph "Services"
+            AuthService_BE["Auth Service"]
+            BookingService_BE["Booking Service"]
+            AvailabilityService_BE["Availability Service"]
+            UserService_BE["User Service"]
+            EmailService["Email Service"]
+            LoggerService["Logger Service"]
+            PaymentService["Payment Service (Planned)"]
+            WidgetService["Widget Service (Planned)"]
+            BrandingService["Branding Service (Planned)"]
+        end
+        subgraph "Models"
+            UserModel["User Model"]
+            BookingModel["Booking Model"]
+            AvailabilityModel["Availability Model"]
+            PaymentModel["Payment Model (Planned)"]
+            BrandingModel["Branding Model (Planned)"]
+        end
+        subgraph "Repositories"
+            UserRepo["User Repository"]
+            BookingRepo["Booking Repository"]
+            AvailabilityRepo["Availability Repository"]
+            PaymentRepo["Payment Repository (Planned)"]
+            BrandingRepo["Branding Repository (Planned)"]
+        end
+    end
+
+    subgraph "External Services"
+        DigitalSamba["Digital Samba API"]
+        EmailProvider["Email Provider"]
+        PaymentGateway["Payment Gateway (Planned)"]
+        CDN["CDN for Assets (Planned)"]
+    end
+
+    subgraph "Database"
+        MongoDB["MongoDB"]
+        subgraph "Collections"
+            UsersCollection["Users Collection"]
+            BookingsCollection["Bookings Collection"]
+            AvailabilityCollection["Availability Collection"]
+            PaymentsCollection["Payments Collection (Planned)"]
+            BrandingCollection["Branding Collection (Planned)"]
+            LogsCollection["Logs Collection"]
+        end
+    end
+
+    %% Frontend to Backend connections
+    VueApp -->|HTTP Requests| PHPBackend
+    API -->|Axios| PHPBackend
+    
+    %% State Management
+    PiniaStore -->|State| VueApp
+    AuthStore -->|Auth State| VueApp
+    BookingsStore -->|Bookings State| VueApp
+    
+    %% Service connections to backend
+    AuthService -->|Authentication| API
+    BookingService -->|CRUD Operations| API
+    AvailabilityService -->|Manage Availability| API
+    PublicBookingService -->|Public Booking| API
+    
+    %% Backend to Database connections
+    PHPBackend -->|CRUD Operations| MongoDB
+    UserRepo -->|Queries & Updates| UsersCollection
+    BookingRepo -->|Queries & Updates| BookingsCollection
+    AvailabilityRepo -->|Queries & Updates| AvailabilityCollection
+    
+    %% External Services connections
+    PHPBackend -->|Video Meeting Integration| DigitalSamba
+    PHPBackend -->|Send Emails| EmailProvider
+    PHPBackend -->|Process Payments| PaymentGateway
+    PHPBackend -->|Serve Assets| CDN
+    
+    %% Controller to Service connections
+    AuthController -->|Uses| AuthService_BE
+    BookingController -->|Uses| BookingService_BE
+    AvailabilityController -->|Uses| AvailabilityService_BE
+    UserController -->|Uses| UserService_BE
+    PublicController -->|Uses| BookingService_BE
+    PublicController -->|Uses| AvailabilityService_BE
+    
+    %% Service to Repository connections
+    AuthService_BE -->|Data Access| UserRepo
+    BookingService_BE -->|Data Access| BookingRepo
+    AvailabilityService_BE -->|Data Access| AvailabilityRepo
+    UserService_BE -->|Data Access| UserRepo
+    
+    %% Service to External Service connections
+    BookingService_BE -->|Create Meetings| DigitalSamba
+    EmailService -->|Send Notifications| EmailProvider
+    
+    %% Planned Features (dashed connections)
+    PaymentController -.->|Uses| PaymentService
+    PaymentService -.->|Data Access| PaymentRepo
+    PaymentRepo -.->|Queries & Updates| PaymentsCollection
+    PaymentService -.->|Process Payments| PaymentGateway
+    
+    WidgetController -.->|Uses| WidgetService
+    
+    BrandingController -.->|Uses| BrandingService
+    BrandingService -.->|Data Access| BrandingRepo
+    BrandingRepo -.->|Queries & Updates| BrandingCollection
+    BrandingService -.->|Asset Delivery| CDN
+
+    %% Logging connections
+    LoggerService -->|Store Logs| LogsCollection
+    PHPBackend -->|Uses| LoggerService
+
+    %% Component structure
+    VueApp -->|Contains| Components
+    VueApp -->|Routes to| HomeView
+    VueApp -->|Routes to| LoginView
+    VueApp -->|Routes to| BookingsView
+    VueApp -->|Routes to| AvailabilityView
+    VueApp -->|Routes to| ProfileView
+    VueApp -->|Routes to| PublicBookingView
+    VueApp -->|Routes to| RegisterView
+    
+    Components -->|Includes| AppLogo
+    Components -->|Includes| BookingForm
+    Components -->|Includes| BookingCard
+    Components -->|Includes| SuccessModal
+
+    %% Model to Repository connections
+    UserRepo -->|Uses| UserModel
+    BookingRepo -->|Uses| BookingModel
+    AvailabilityRepo -->|Uses| AvailabilityModel
+    PaymentRepo -.->|Uses| PaymentModel
+    BrandingRepo -.->|Uses| BrandingModel
+```

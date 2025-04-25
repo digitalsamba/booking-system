@@ -1,0 +1,137 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# MongoDB Guidelines for SambaConnect
+
+## Database Structure
+
+1. Collections should be organized by domain entities:
+   - users
+   - availability
+   - bookings
+   - payments
+   - settings
+   - logs
+
+2. Use schema validation for all collections to ensure data integrity
+
+3. Design collections to support common query patterns
+
+4. Balance between normalization and denormalization based on access patterns
+
+5. Consider document size limitations (16MB) for all schema designs
+
+## Schema Design
+
+1. Use descriptive field names that align with application entities
+
+2. Design schemas to avoid excessive nesting (max 2-3 levels deep)
+
+3. Use appropriate data types for all fields
+
+4. Include timestamps for created_at and updated_at in all documents
+
+5. Use ObjectId for document IDs unless there's a specific reason not to
+
+6. Consider embedded documents for one-to-few relationships
+
+7. Use references for one-to-many or many-to-many relationships
+
+## Indexing Strategy
+
+1. Create indexes for all frequently queried fields
+
+2. Use compound indexes for queries on multiple fields
+
+3. Consider text indexes for search functionality
+
+4. Use unique indexes where appropriate
+
+5. Be mindful of index size and performance impact
+
+6. Monitor index usage to identify unused indexes
+
+7. Consider time-to-live (TTL) indexes for temporary data
+
+## Query Optimization
+
+1. Use projection to return only necessary fields
+
+2. Apply appropriate filters early in query pipeline
+
+3. Use aggregation framework efficiently
+
+4. Avoid large in-memory sorting operations
+
+5. Use appropriate index hints when necessary
+
+6. Monitor slow queries and optimize as needed
+
+7. Consider read preferences for query distribution
+
+## Performance Considerations
+
+1. Implement connection pooling for MongoDB connections
+
+2. Configure appropriate write concern and read preferences
+
+3. Use bulk operations for multiple document modifications
+
+4. Consider data lifetime and archiving strategies
+
+5. Implement caching for frequently accessed data
+
+6. Monitor database performance metrics
+
+7. Use appropriate MongoDB driver settings
+
+## Security
+
+1. Use authentication and authorization for all MongoDB connections
+
+2. Follow principle of least privilege for database users
+
+3. Validate all user input before database operations
+
+4. Implement proper error handling for database operations
+
+5. Avoid NoSQL injection vulnerabilities
+
+6. Encrypt sensitive data before storing
+
+7. Consider field-level encryption for highly sensitive data
+
+## MongoDB in Docker
+
+1. Use official MongoDB Docker image
+
+2. Configure persistent volume for data storage
+
+3. Set appropriate memory and CPU limits
+
+4. Configure authentication for production environments
+
+5. Use MongoDB replica sets for high availability
+
+6. Implement proper backup procedures
+
+7. Configure proper networking for MongoDB container
+
+## MongoDB on Windows
+
+1. Handle Windows-specific path issues for data directory
+
+2. Configure appropriate memory limits considering Windows environment
+
+3. Handle service configuration for automatic startup
+
+4. Consider file locking issues on Windows
+
+5. Configure MongoDB log file location appropriately
+
+6. Handle line ending differences in configuration files
+
+
+7. Use appropriate connection string format for Windows

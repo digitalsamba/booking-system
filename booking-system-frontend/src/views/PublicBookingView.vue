@@ -5,15 +5,27 @@
         <v-card class="pa-6">
           <div class="text-center mb-6">
             <img src="/assets/logo.svg" alt="SambaConnect" height="120" class="mb-4">
-            <h1 class="text-h4 mb-2">
-              <template v-if="provider && (provider.display_name || provider.username)">
-                Book a Meeting with {{ provider.display_name || provider.username }}
-              </template>
-              <template v-else>
-                <v-progress-circular indeterminate></v-progress-circular>
-              </template>
-            </h1>
-            <p class="text-body-1 text-medium-emphasis">Select an available time slot below</p>
+            
+            <!-- Original Header -->
+            <template v-if="!bookingCompleted">
+              <h1 class="text-h4 mb-2">
+                <template v-if="provider && (provider.display_name || provider.username)">
+                  Book a Meeting with {{ provider.display_name || provider.username }}
+                </template>
+                <template v-else>
+                  <v-progress-circular indeterminate></v-progress-circular>
+                </template>
+              </h1>
+              <p class="text-body-1 text-medium-emphasis">Select an available time slot below</p>
+            </template>
+
+            <!-- Funky Success Header -->
+            <template v-else>
+              <div class="funky-success-vibes">
+                Made with vibes
+              </div>
+            </template>
+
           </div>
 
           <!-- Error Message -->
@@ -34,100 +46,103 @@
             {{ success }}
           </v-alert>
 
-          <!-- Date Selection -->
-          <v-card class="mb-6">
-            <v-card-title class="text-h6">Select Date</v-card-title>
-            <v-card-text>
-              <v-row>
-                <v-col cols="12">
-                  <v-date-picker
-                    v-model="selectedDate"
-                    :min="minDate"
-                    :max="maxDate"
-                    :allowed-dates="allowedDates"
-                    @update:model-value="loadAvailableSlots"
-                    class="mt-2"
-                    full-width
-                    elevation="0"
-                    :day-format="(date) => {
-                      const formattedDate = new Date(date).toLocaleDateString('en-CA')
-                      return availableDates.has(formattedDate) ? '●' : ''
-                    }"
-                    :day-props="(date) => {
-                      const formattedDate = new Date(date).toLocaleDateString('en-CA')
-                      return {
-                        class: availableDates.has(formattedDate) ? 'available-date' : ''
-                      }
-                    }"
-                  ></v-date-picker>
-                </v-col>
-              </v-row>
-            </v-card-text>
-          </v-card>
+          <!-- Show booking sections only if booking is NOT completed -->
+          <template v-if="!bookingCompleted">
+            <!-- Date Selection -->
+            <v-card class="mb-6">
+              <v-card-title class="text-h6">Select Date</v-card-title>
+              <v-card-text>
+                <v-row>
+                  <v-col cols="12">
+                    <v-date-picker
+                      v-model="selectedDate"
+                      :min="minDate"
+                      :max="maxDate"
+                      :allowed-dates="allowedDates"
+                      @update:model-value="loadAvailableSlots"
+                      class="mt-2"
+                      full-width
+                      elevation="0"
+                      :day-format="(date) => {
+                        const formattedDate = new Date(date).toLocaleDateString('en-CA')
+                        return availableDates.has(formattedDate) ? '●' : ''
+                      }"
+                      :day-props="(date) => {
+                        const formattedDate = new Date(date).toLocaleDateString('en-CA')
+                        return {
+                          class: availableDates.has(formattedDate) ? 'available-date' : ''
+                        }
+                      }"
+                    ></v-date-picker>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+            </v-card>
 
-          <!-- Time Slots -->
-          <v-card v-if="selectedDate" class="mb-6">
-            <v-card-title class="text-h6">Available Time Slots</v-card-title>
-            <v-card-text>
-              <v-row>
-                <v-col v-for="slot in availableSlots" :key="slot.id" cols="12" sm="6" md="4">
+            <!-- Time Slots -->
+            <v-card v-if="selectedDate" class="mb-6">
+              <v-card-title class="text-h6">Available Time Slots</v-card-title>
+              <v-card-text>
+                <v-row>
+                  <v-col v-for="slot in availableSlots" :key="slot.id" cols="12" sm="6" md="4">
+                    <v-btn
+                      block
+                      :color="slot.id === selectedSlot?.id ? 'primary' : 'default'"
+                      :variant="slot.id === selectedSlot?.id ? 'flat' : 'outlined'"
+                      @click="selectTimeSlot(slot)"
+                      :disabled="slot.isBooked"
+                    >
+                      {{ formatTime(slot.startTime) }} - {{ formatTime(slot.endTime) }}
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+            </v-card>
+
+            <!-- Booking Form -->
+            <v-card v-if="selectedSlot" class="mb-6">
+              <v-card-title class="text-h6">Booking Details</v-card-title>
+              <v-card-text>
+                <v-form ref="form" v-model="isFormValid">
+                  <v-text-field
+                    v-model="bookingForm.name"
+                    label="Your Name"
+                    :rules="[v => !!v || 'Name is required']"
+                    required
+                    class="mb-4"
+                  ></v-text-field>
+
+                  <v-text-field
+                    v-model="bookingForm.email"
+                    label="Your Email"
+                    :rules="[
+                      v => !!v || 'Email is required',
+                      v => /.+@.+\..+/.test(v) || 'Email must be valid'
+                    ]"
+                    required
+                    class="mb-4"
+                  ></v-text-field>
+
+                  <v-textarea
+                    v-model="bookingForm.notes"
+                    label="Meeting Notes (Optional)"
+                    rows="3"
+                    class="mb-4"
+                  ></v-textarea>
+
                   <v-btn
+                    color="primary"
                     block
-                    :color="slot.id === selectedSlot?.id ? 'primary' : 'default'"
-                    :variant="slot.id === selectedSlot?.id ? 'flat' : 'outlined'"
-                    @click="selectTimeSlot(slot)"
-                    :disabled="slot.isBooked"
+                    :loading="isSubmitting"
+                    :disabled="!isFormValid"
+                    @click="submitBooking"
                   >
-                    {{ formatTime(slot.startTime) }} - {{ formatTime(slot.endTime) }}
+                    Confirm Booking
                   </v-btn>
-                </v-col>
-              </v-row>
-            </v-card-text>
-          </v-card>
-
-          <!-- Booking Form -->
-          <v-card v-if="selectedSlot" class="mb-6">
-            <v-card-title class="text-h6">Booking Details</v-card-title>
-            <v-card-text>
-              <v-form ref="form" v-model="isFormValid">
-                <v-text-field
-                  v-model="bookingForm.name"
-                  label="Your Name"
-                  :rules="[v => !!v || 'Name is required']"
-                  required
-                  class="mb-4"
-                ></v-text-field>
-
-                <v-text-field
-                  v-model="bookingForm.email"
-                  label="Your Email"
-                  :rules="[
-                    v => !!v || 'Email is required',
-                    v => /.+@.+\..+/.test(v) || 'Email must be valid'
-                  ]"
-                  required
-                  class="mb-4"
-                ></v-text-field>
-
-                <v-textarea
-                  v-model="bookingForm.notes"
-                  label="Meeting Notes (Optional)"
-                  rows="3"
-                  class="mb-4"
-                ></v-textarea>
-
-                <v-btn
-                  color="primary"
-                  block
-                  :loading="isSubmitting"
-                  :disabled="!isFormValid"
-                  @click="submitBooking"
-                >
-                  Confirm Booking
-                </v-btn>
-              </v-form>
-            </v-card-text>
-          </v-card>
+                </v-form>
+              </v-card-text>
+            </v-card>
+          </template>
         </v-card>
       </v-col>
     </v-row>
@@ -149,6 +164,7 @@ export default {
     const isSubmitting = ref(false)
     const error = ref(null)
     const success = ref(null)
+    const bookingCompleted = ref(false)
     
     // Provider details
     const provider = ref({})
@@ -293,7 +309,9 @@ export default {
     }
 
     const submitBooking = async () => {
-      if (!form.value.validate()) return
+      // Use validate method on the form reference directly
+      const { valid } = await form.value.validate()
+      if (!valid) return
       
       isSubmitting.value = true
       error.value = null
@@ -319,6 +337,7 @@ export default {
         console.log('Booking response:', response.data)
         
         success.value = 'Booking created successfully! You will receive a confirmation email shortly with your meeting link.'
+        bookingCompleted.value = true
         
         // Clear form and selection
         bookingForm.value = {
@@ -361,7 +380,8 @@ export default {
       loadAvailableSlots,
       selectTimeSlot,
       formatTime,
-      submitBooking
+      submitBooking,
+      bookingCompleted
     }
   }
 }
@@ -386,5 +406,28 @@ export default {
   height: 4px;
   background-color: var(--v-primary-base);
   border-radius: 50%;
+}
+
+.funky-success-vibes {
+  font-size: 3rem; /* Large */
+  font-weight: bold;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  /* Garish gradient text effect */
+  background: linear-gradient(90deg, #ff00ff, #00ffff, #ffff00, #ff00ff);
+  background-size: 200% auto;
+  color: #fff;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: vibes-animation 4s linear infinite;
+  /* Add some text shadow for extra pop */
+  text-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+}
+
+@keyframes vibes-animation {
+  0% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+  100% { background-position: 0% center; }
 }
 </style> 

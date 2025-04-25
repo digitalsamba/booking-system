@@ -131,3 +131,6 @@ dist
 
 # Composer vendor directory
 /booking-system-backend/vendor/
+
+# cursor bits
+.cursor/
