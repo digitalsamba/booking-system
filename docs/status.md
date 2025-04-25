@@ -36,9 +36,12 @@ The SambaConnect booking system is currently in active development. Core functio
 ## In Progress Features
 
 ### Branding & Customization
-- 🔄 Planning and design phase for booking form branding
+- ✅ Designed MongoDB schema for `branding_settings` collection.
+- ✅ Created initial backend `BrandingService` and `BrandingController`.
+- ✅ Added `GET /api/branding` and `PUT /api/branding` endpoints to `router.php`.
+- 🔄 TODO: Implement logo upload functionality (backend).
+- 🔄 TODO: Implement frontend UI for managing branding settings.
 - 🔄 Research on image handling and storage solutions
-- 🔄 Initial architecture for branding component
 
 ### Payment Integration
 - 🔄 Initial planning for payment service integration
@@ -67,10 +70,14 @@ The SambaConnect booking system is currently in active development. Core functio
 ## Technical Debt & Issues
 
 ### Backend
-- Optimize MongoDB queries for better performance
-- Implement more comprehensive logging system
-- Enhance error handling for edge cases
-- Improve security practices for API endpoints
+- ~~'router.php' uses complex/fragile mix of prefix and preg_match routing.~~ (Replaced with FastRoute)
+- Controller methods need parameter adjustments for FastRoute parameter passing (Partially done for Booking, DS, Public controllers).
+- Instantiate controllers directly (Consider DI container like PHP-DI later).
+- Logging relies heavily on `error_log`; consider structured logging (e.g., Monolog).
+- Optimize MongoDB queries for better performance.
+- Enhance error handling for edge cases.
+- Improve security practices for API endpoints.
+- ✅ Addressed bug where user profile updates failed silently on frontend due to backend response structure mismatch.
 
 ### Frontend
 - Refactor some components for better reusability
@@ -87,6 +94,13 @@ The SambaConnect booking system is currently in active development. Core functio
 5. Implement first version of basic analytics
 
 ## Recent Updates
+- Refactored backend routing using FastRoute (`nikic/fast-route`) for improved clarity and maintainability.
+- Created `config/routes.php` for centralized route definitions.
+- Simplified `router.php` to use the FastRoute dispatcher.
+- Adjusted several controller methods to accept route parameters from FastRoute.
+- Implemented initial backend infrastructure (Service, Controller, Routes) for Branding feature.
+- Updated frontend dependencies (Vue to ^3.4, Vite to ^5.3, Axios to ^1.9) to latest stable versions to leverage new features and address security vulnerabilities.
+  - *Note: A persistent but low-priority Vite deprecation warning ('CJS build of Vite's Node API is deprecated') remains after updates; dev server functionality is unaffected.*
 - Added confirmation dialogs for availability slot deletion
 - Improved error handling in API service
 - Enhanced profile page with Digital Samba integration

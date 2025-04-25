@@ -365,30 +365,11 @@ class DigitalSambaController {
      * Generate meeting links for a booking
      * Creates a Digital Samba room and generates access tokens for provider and customer
      */
-    public function generateMeetingLinks($bookingId = null) {
+    public function generateMeetingLinks(string $bookingId) {
         // Keep top-level entry log
         error_log("DigitalSambaController: ENTER generateMeetingLinks for booking ID: " . $bookingId);
         
         try {
-            // Use provided booking ID or extract from request
-            if (!$bookingId) {
-                // Get booking ID correctly from path info or URL
-                $pathParts = explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
-                // The booking ID should be the part after 'booking' and before 'meeting-links'
-                foreach ($pathParts as $index => $part) {
-                    if ($part === 'booking' && isset($pathParts[$index + 1])) {
-                        $bookingId = $pathParts[$index + 1];
-                        break;
-                    }
-                }
-                
-                if (!$bookingId) {
-                    error_log("DS_ERROR: Could not extract booking ID from path: " . ($_SERVER['PATH_INFO'] ?? 'N/A'));
-                    // Return an error array instead of calling Response::json directly
-                    return ['error' => 'Booking ID is required', 'status' => 400];
-                }
-            }
-            
             // Get booking
             $booking = $this->bookingModel->getById($bookingId);
             
@@ -573,29 +554,8 @@ class DigitalSambaController {
     /**
      * Get meeting links for a booking
      */
-    public function getMeetingLinks($bookingId = null) {
+    public function getMeetingLinks(string $bookingId) {
         try {
-            // Use provided booking ID or extract from request
-            if (!$bookingId) {
-                // Get booking ID correctly from path info or URL
-                $pathParts = explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
-                // The booking ID should be the part after 'booking' and before 'meeting-links'
-                foreach ($pathParts as $index => $part) {
-                    if ($part === 'booking' && isset($pathParts[$index + 1])) {
-                        $bookingId = $pathParts[$index + 1];
-                        break;
-                    }
-                }
-                
-                if (!$bookingId) {
-                    error_log("Could not extract booking ID from path: " . ($_SERVER['PATH_INFO'] ?? 'N/A'));
-                    Response::json(['error' => 'Booking ID is required'], 400);
-                    return;
-                }
-            }
-            
-            error_log("Getting meeting links for booking ID: " . $bookingId);
-            
             // Get booking
             $booking = $this->bookingModel->getById($bookingId);
             

@@ -205,11 +205,13 @@ class AuthController extends BaseController {
         }
         
         // Get JSON input data
+        // error_log("Raw input for updateProfile: " . file_get_contents('php://input')); // Removed Temp Debug
         $data = $this->getJsonData();
         
         try {
             // Update user in database
-            $updated = $this->userModel->updateProfile($userId, $data);
+            $updated = $this->userModel->updateProfile($userId, $data); 
+            // error_log("AuthController::updateProfile - updateProfile returned: " . ($updated ? 'true' : 'false')); // Removed Temp Debug
             
             if (!$updated) {
                 Response::json(['error' => 'Failed to update profile'], 400);
@@ -217,21 +219,33 @@ class AuthController extends BaseController {
             }
             
             // Get updated user data
+            // error_log("AuthController::updateProfile - Calling findById for ID: {$userId}"); // Removed Temp Debug
             $user = $this->userModel->findById($userId);
             
-            // Return updated profile
+            if (!$user) { // Added check for null user
+                // error_log("AuthController::updateProfile - User found null after successful update for ID: {$userId}"); // Removed Temp Debug
+                Response::json(['error' => 'Failed to retrieve profile after update'], 500);
+                return;
+            }
+            
+            // error_log("AuthController::updateProfile - findById returned user data. Preparing success response."); // Removed Temp Debug
+            
+            // Return updated profile in the structure expected by Response::json
             Response::json([
+                'success' => true,
                 'message' => 'Profile updated successfully',
-                'user' => [
-                    'id' => isset($user['_id']) ? (string)$user['_id'] : '',
-                    'username' => $user['username'],
-                    'email' => $user['email'],
-                    'role' => $user['role'] ?? 'user',
-                    'display_name' => $user['display_name'] ?? $user['username'],
-                    'profile' => $user['profile'] ?? [],
-                    'team_id' => $user['team_id'] ?? '',
-                    'developer_key' => $user['developer_key'] ?? '',
-                    'updated_at' => time()
+                'data' => [
+                    'user' => [
+                        'id' => isset($user['_id']) ? (string)$user['_id'] : '',
+                        'username' => $user['username'],
+                        'email' => $user['email'],
+                        'role' => $user['role'] ?? 'user',
+                        'display_name' => $user['display_name'] ?? $user['username'],
+                        'profile' => $user['profile'] ?? [],
+                        'team_id' => $user['team_id'] ?? '',
+                        'developer_key' => $user['developer_key'] ?? '',
+                        'updated_at' => time()
+                    ]
                 ]
             ]);
             

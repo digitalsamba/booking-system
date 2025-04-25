@@ -32,6 +32,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
+    include: ['vue', 'vuetify', 'pinia', 'vue-router', 'axios'],
     exclude: []
   },
   build: {

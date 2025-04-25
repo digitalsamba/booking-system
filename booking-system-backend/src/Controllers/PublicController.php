@@ -570,33 +570,34 @@ class PublicController extends BaseController {
 
     /**
      * Get provider details by username
+     * @param string $username Provider username from route parameter
      */
-    public function getProviderDetails($username) {
-        try {
-            error_log("PUBLIC CONTROLLER: Fetching provider details for username: " . $username);
-            
-            // Find the user by username
-            $user = $this->userModel->findByUsername($username);
-            
-            if (!$user) {
-                error_log("PUBLIC CONTROLLER: Provider not found with username: " . $username);
-                Response::json(['error' => 'Provider not found'], 404);
-                return;
-            }
-
-            error_log("PUBLIC CONTROLLER: Found provider: " . json_encode($user));
-            
-            // Return only the necessary provider information
-            Response::json([
-                'id' => (string)$user['_id'],
-                'display_name' => $user['display_name'] ?? $user['username'],
-                'email' => $user['email'],
-                'username' => $user['username']
-            ]);
-        } catch (\Exception $e) {
-            error_log("PUBLIC CONTROLLER: Error in getProviderDetails: " . $e->getMessage());
-            error_log("PUBLIC CONTROLLER: Stack trace: " . $e->getTraceAsString());
-            Response::json(['error' => 'Error fetching provider details: ' . $e->getMessage()], 500);
+    public function getProviderDetails(string $username)
+    {
+        error_log("PUBLIC CONTROLLER: getProviderDetails request for username: {$username}");
+        
+        if (!$username) {
+            error_log("PUBLIC CONTROLLER: No username provided for getProviderDetails");
+            Response::json(['error' => 'Username is required'], 400);
+            return;
         }
+        
+        // Find provider by username
+        $provider = $this->userModel->findByUsername($username);
+        
+        if (!$provider) {
+            error_log("PUBLIC CONTROLLER: Provider not found with username: {$username}");
+            Response::json(['error' => 'Provider not found'], 404);
+            return;
+        }
+        
+        // Prepare response data (only public fields)
+        $responseData = [
+            'username' => $provider['username'],
+            'display_name' => $provider['display_name'] ?? $provider['username'],
+            // Add other public fields as needed, e.g., profile picture, description
+        ];
+        
+        Response::json($responseData);
     }
 }
