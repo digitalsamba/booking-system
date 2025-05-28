@@ -22,5 +22,21 @@ export default {
     return apiClient.put(BASE_URL, settingsData);
   },
 
+  /**
+   * Uploads a logo file for the authenticated user.
+   * @param {File} file The logo file to upload.
+   * @returns {Promise<object>} The API response containing the new logo URL.
+   */
+  uploadLogo(file) {
+    const formData = new FormData();
+    formData.append('logoFile', file); // Key must match backend expectation
+
+    return apiClient.post(`${BASE_URL}/logo`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  },
+
   // TODO: Add method for uploading logo (e.g., uploadLogo(file))
 }; 

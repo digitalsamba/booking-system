@@ -1,25 +1,40 @@
 <template>
-  <v-container>
+  <v-container :style="pageStyle">
     <v-row justify="center">
       <v-col cols="12" md="8">
-        <v-card class="pa-6">
+        <component :is="'style'" v-if="brandingSettings.customCss">
+          {{ brandingSettings.customCss }}
+        </component>
+
+        <v-card class="pa-6" :style="cardStyle">
           <div class="text-center mb-6">
-            <img src="/assets/logo.svg" alt="SambaConnect" height="120" class="mb-4">
+            <img 
+              v-if="brandingSettings.logoUrl"
+              :src="brandingSettings.logoUrl" 
+              alt="Provider Logo" 
+              style="max-height: 120px; max-width: 300px; object-fit: contain;"
+              class="mb-4"
+            >
+            <img 
+              v-else
+              src="/assets/logo.svg" 
+              alt="SambaConnect" 
+              height="120" 
+              class="mb-4"
+            >
             
-            <!-- Original Header -->
             <template v-if="!bookingCompleted">
-              <h1 class="text-h4 mb-2">
+              <h1 class="text-h4 mb-2" :style="{ color: brandingSettings.textColor }">
                 <template v-if="provider && (provider.display_name || provider.username)">
                   Book a Meeting with {{ provider.display_name || provider.username }}
                 </template>
                 <template v-else>
-                  <v-progress-circular indeterminate></v-progress-circular>
+                  <v-progress-circular indeterminate :color="brandingSettings.primaryColor"></v-progress-circular>
                 </template>
               </h1>
-              <p class="text-body-1 text-medium-emphasis">Select an available time slot below</p>
+              <p class="text-body-1 text-medium-emphasis" :style="{ color: brandingSettings.textColor, opacity: 0.8 }">Select an available time slot below</p>
             </template>
 
-            <!-- Funky Success Header -->
             <template v-else>
               <div class="funky-success-vibes">
                 Made with vibes
@@ -28,7 +43,6 @@
 
           </div>
 
-          <!-- Error Message -->
           <v-alert
             v-if="error"
             type="error"
@@ -37,7 +51,6 @@
             {{ error }}
           </v-alert>
 
-          <!-- Success Message -->
           <v-alert
             v-if="success"
             type="success"
@@ -46,11 +59,9 @@
             {{ success }}
           </v-alert>
 
-          <!-- Show booking sections only if booking is NOT completed -->
           <template v-if="!bookingCompleted">
-            <!-- Date Selection -->
             <v-card class="mb-6">
-              <v-card-title class="text-h6">Select Date</v-card-title>
+              <v-card-title class="text-h6" :style="{ color: brandingSettings.textColor }">Select Date</v-card-title>
               <v-card-text>
                 <v-row>
                   <v-col cols="12">
@@ -63,6 +74,8 @@
                       class="mt-2"
                       full-width
                       elevation="0"
+                      :color="brandingSettings.primaryColor" 
+                      :header-color="brandingSettings.primaryColor"
                       :day-format="(date) => {
                         const formattedDate = new Date(date).toLocaleDateString('en-CA')
                         return availableDates.has(formattedDate) ? '●' : ''
@@ -70,7 +83,8 @@
                       :day-props="(date) => {
                         const formattedDate = new Date(date).toLocaleDateString('en-CA')
                         return {
-                          class: availableDates.has(formattedDate) ? 'available-date' : ''
+                          class: availableDates.has(formattedDate) ? 'available-date' : '',
+                          style: availableDates.has(formattedDate) ? { '--v-primary-base': brandingSettings.primaryColor } : {}
                         }
                       }"
                     ></v-date-picker>
@@ -79,15 +93,15 @@
               </v-card-text>
             </v-card>
 
-            <!-- Time Slots -->
             <v-card v-if="selectedDate" class="mb-6">
-              <v-card-title class="text-h6">Available Time Slots</v-card-title>
+              <v-card-title class="text-h6" :style="{ color: brandingSettings.textColor }">Available Time Slots</v-card-title>
               <v-card-text>
                 <v-row>
                   <v-col v-for="slot in availableSlots" :key="slot.id" cols="12" sm="6" md="4">
                     <v-btn
                       block
-                      :color="slot.id === selectedSlot?.id ? 'primary' : 'default'"
+                      :color="slot.id === selectedSlot?.id ? brandingSettings.primaryColor : 'default'"
+                      :style="slot.id !== selectedSlot?.id ? { borderColor: brandingSettings.secondaryColor, color: brandingSettings.secondaryColor } : {}"
                       :variant="slot.id === selectedSlot?.id ? 'flat' : 'outlined'"
                       @click="selectTimeSlot(slot)"
                       :disabled="slot.isBooked"
@@ -99,9 +113,8 @@
               </v-card-text>
             </v-card>
 
-            <!-- Booking Form -->
             <v-card v-if="selectedSlot" class="mb-6">
-              <v-card-title class="text-h6">Booking Details</v-card-title>
+              <v-card-title class="text-h6" :style="{ color: brandingSettings.textColor }">Booking Details</v-card-title>
               <v-card-text>
                 <v-form ref="form" v-model="isFormValid">
                   <v-text-field
@@ -110,6 +123,9 @@
                     :rules="[v => !!v || 'Name is required']"
                     required
                     class="mb-4"
+                    :color="brandingSettings.primaryColor"
+                    :base-color="brandingSettings.textColor"
+                    :label-color="brandingSettings.textColor"
                   ></v-text-field>
 
                   <v-text-field
@@ -121,6 +137,9 @@
                     ]"
                     required
                     class="mb-4"
+                    :color="brandingSettings.primaryColor"
+                     :base-color="brandingSettings.textColor"
+                    :label-color="brandingSettings.textColor"
                   ></v-text-field>
 
                   <v-textarea
@@ -128,10 +147,13 @@
                     label="Meeting Notes (Optional)"
                     rows="3"
                     class="mb-4"
+                    :color="brandingSettings.primaryColor"
+                    :base-color="brandingSettings.textColor"
+                    :label-color="brandingSettings.textColor"
                   ></v-textarea>
 
                   <v-btn
-                    color="primary"
+                    :color="brandingSettings.primaryColor" 
                     block
                     :loading="isSubmitting"
                     :disabled="!isFormValid"
@@ -150,7 +172,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { publicBookingService } from '../services/api'
 
@@ -168,6 +190,21 @@ export default {
     
     // Provider details
     const provider = ref({})
+    const providerUserId = ref(null)
+
+    // Branding Settings (use reactive)
+    const brandingSettings = reactive({
+      logoUrl: '',
+      primaryColor: '#1976D2', // Default Vuetify blue
+      secondaryColor: '#424242', // Default Vuetify grey
+      backgroundColor: '#FFFFFF',
+      textColor: '#000000',
+      fontFamily: '', // Default browser font
+      customCss: ''
+    })
+    const brandingLoading = ref(false);
+    const brandingError = ref(null);
+
     const selectedDate = ref(null)
     const selectedSlot = ref(null)
     const availableSlots = ref([])
@@ -228,8 +265,43 @@ export default {
       }
     }
 
-    // Load provider details
+    // Fetch branding settings
+    const loadBrandingSettings = async (userId) => {
+      if (!userId) return;
+      brandingLoading.value = true;
+      brandingError.value = null;
+      try {
+        const response = await publicBookingService.getBrandingSettings(userId);
+        const fetchedData = response.data; // Assuming direct data return now
+        if (fetchedData && typeof fetchedData === 'object') {
+            console.log('Fetched public branding settings:', fetchedData);
+            brandingSettings.logoUrl = fetchedData.logoUrl ?? '';
+            brandingSettings.primaryColor = fetchedData.primaryColor ?? '#1976D2';
+            brandingSettings.secondaryColor = fetchedData.secondaryColor ?? '#424242';
+            brandingSettings.backgroundColor = fetchedData.backgroundColor ?? '#FFFFFF';
+            brandingSettings.textColor = fetchedData.textColor ?? '#000000';
+            brandingSettings.fontFamily = fetchedData.fontFamily ?? '';
+            brandingSettings.customCss = fetchedData.customCss ?? '';
+        } else {
+            console.log(`No specific branding settings found for userId ${userId}, using defaults.`);
+            // Keep defaults if no settings found
+        }
+      } catch (err) {
+        if (err.response && err.response.status === 404) {
+             console.log(`No branding settings found for userId ${userId} (404). Using defaults.`);
+             // Keep defaults
+        } else {
+            console.error('Error loading branding settings:', err);
+            brandingError.value = 'Could not load branding appearance.'; // User-friendly error
+        }
+      } finally {
+        brandingLoading.value = false;
+      }
+    };
+
+    // Load provider details AND branding
     const loadProviderDetails = async () => {
+      error.value = null; // Clear main error
       try {
         const username = route.params.username
         if (!username) {
@@ -239,9 +311,20 @@ export default {
 
         const response = await publicBookingService.getProviderDetails(username)
         console.log('Provider details response:', response.data)
-        provider.value = response.data.data // Access the nested data property
+        provider.value = response.data?.data ?? response.data // Handle potential nesting
+        providerUserId.value = provider.value?.userId // Get userId from response
+
+        if (!providerUserId.value) {
+            console.error('Provider details response missing userId!', provider.value);
+            error.value = 'Could not load provider information correctly.';
+            return; // Cannot load branding without userId
+        }
+
         // Load available dates after getting provider details
         await loadAvailableDates()
+        // Load branding settings using the fetched userId
+        await loadBrandingSettings(providerUserId.value)
+
       } catch (err) {
         console.error('Error loading provider details:', err)
         error.value = 'Unable to load provider details. Please try again later.'
@@ -362,6 +445,17 @@ export default {
       await loadProviderDetails()
     })
 
+    // Computed styles for applying branding
+    const pageStyle = computed(() => ({
+      backgroundColor: brandingSettings.backgroundColor,
+      fontFamily: brandingSettings.fontFamily || 'inherit' // Apply font globally if set
+    }));
+
+    const cardStyle = computed(() => ({
+        // Could add card-specific background if needed, but pageStyle might suffice
+        // color: brandingSettings.textColor // Set base text color for card? Handled inline mostly
+    }));
+
     return {
       provider,
       selectedDate,
@@ -381,7 +475,12 @@ export default {
       selectTimeSlot,
       formatTime,
       submitBooking,
-      bookingCompleted
+      bookingCompleted,
+      brandingSettings,
+      brandingLoading,
+      brandingError,
+      pageStyle,
+      cardStyle
     }
   }
 }
@@ -404,7 +503,7 @@ export default {
   transform: translateX(-50%);
   width: 4px;
   height: 4px;
-  background-color: var(--v-primary-base);
+  background-color: var(--v-primary-base, #1976D2);
   border-radius: 50%;
 }
 

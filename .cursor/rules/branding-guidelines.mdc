@@ -10,10 +10,6 @@ alwaysApply: false
 
 # Booking Form Branding Guidelines for SambaConnect
 
-## Feature Status
-
-The branding feature is currently being re-evaluated and redesigned. Previous implementation work has been reverted to ensure proper architectural planning and implementation.
-
 ## Goals and Requirements
 
 1. Allow service providers to customize the appearance of their booking forms

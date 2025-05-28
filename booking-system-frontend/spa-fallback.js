@@ -10,6 +10,7 @@ export default function() {
         // Ignore Vite's internal paths and API routes
         if (!url.includes('.') && 
             !url.startsWith('/api/') && 
+            !url.startsWith('/public/') &&
             !url.startsWith('/@') && 
             !url.startsWith('/__') && 
             !url.startsWith('/node_modules/')) {

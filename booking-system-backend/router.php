@@ -41,17 +41,25 @@ header('Access-Control-Allow-Origin: *');
 
 // 1. Create dispatcher
 $routeDefinitionCallback = require CONFIG_PATH . '/routes.php';
+// ADDED FOR DEBUGGING: Check if the callback was loaded
+if (is_callable($routeDefinitionCallback)) {
+    error_log("--> Route definition callback loaded successfully.");
+} else {
+    error_log("--> ERROR: Failed to load route definition callback from config/routes.php. Check file syntax and path.");
+    // Optionally, exit here if routes are critical
+    Response::json(['error' => 'Internal Server Error - Route Configuration Failed'], 500);
+    exit;
+}
 $dispatcher = simpleDispatcher($routeDefinitionCallback);
 
 // 2. Get HTTP method and URI
 $httpMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-// Get URI path, remove query string, decode, trim slashes
+// Get URI path, remove query string, decode
 $uri = $_SERVER['REQUEST_URI'] ?? '/';
 if (false !== $pos = strpos($uri, '?')) {
     $uri = substr($uri, 0, $pos);
 }
 $uri = rawurldecode($uri);
-$uri = trim($uri, '/');
 
 // IMPORTANT: Handle potential /api prefix removal.
 // The routes in routes.php are defined *without* the /api prefix because
@@ -63,6 +71,7 @@ $uri = trim($uri, '/');
 error_log("FastRoute Dispatching: Method={$httpMethod}, URI='{$uri}'");
 
 // 3. Dispatch the route
+error_log("--> Attempting to dispatch URI: [" . $uri . "]"); // ADDED FOR DEBUGGING
 $routeInfo = $dispatcher->dispatch($httpMethod, $uri);
 
 // 4. Handle dispatch result

@@ -21,17 +21,62 @@
 
           <!-- Settings Form (shown when not loading) -->
           <template v-else>
+            <!-- Logo Section (Moved to Top) -->
             <v-col cols="12" md="6">
+              <v-label>Logo</v-label>
+              <!-- Logo Preview -->
+              <v-img
+                v-if="settings.logoUrl"
+                :src="settings.logoUrl"
+                :alt="'Current Logo'"
+                max-height="100"
+                max-width="250"
+                contain
+                class="mb-3 mt-1 elevation-1"
+                style="border: 1px solid #eee; background-color: #f9f9f9;"
+              ></v-img>
+              <v-alert v-else type="info" variant="tonal" dense class="mb-3 mt-1">
+                No logo set. Upload one below or paste a URL.
+              </v-alert>
+
+              <!-- Logo URL Input -->
               <v-text-field
                 v-model="settings.logoUrl"
                 label="Logo URL"
-                placeholder="https://example.com/your-logo.png"
+                placeholder="https://example.com/your-logo.png or upload below"
                 outlined
                 dense
-                hint="Enter the full URL of your logo image. Upload functionality coming soon."
+                hint="Paste a URL or upload a file. Upload will overwrite the URL."
                 persistent-hint
+                class="mb-3"
               ></v-text-field>
+
+              <!-- Logo File Upload -->
+              <v-file-input
+                v-model="selectedLogoFile"
+                label="Upload Logo File"
+                accept="image/png, image/jpeg, image/gif, image/svg+xml"
+                outlined
+                dense
+                prepend-icon="mdi-camera"
+                :loading="uploadingLogo"
+                :disabled="uploadingLogo || loading"
+                @update:model-value="handleLogoUpload"
+                class="mb-2"
+                hide-details="auto" 
+              ></v-file-input>
+              <div class="v-messages__message text-caption mb-2" style="padding-left: 16px; padding-right: 16px;">
+                 Max 5MB. Allowed: JPG, PNG, GIF, SVG.
+              </div>
+
+              <!-- Logo Upload Error -->
+              <v-alert v-if="logoUploadError" type="error" dense outlined class="mt-2 mb-4">
+                {{ logoUploadError }}
+              </v-alert>
             </v-col>
+
+            <!-- Placeholder Column if needed for layout -->
+            <v-col cols="12" md="6"></v-col> 
 
             <v-col cols="12">
               <v-divider class="my-4"></v-divider>
@@ -137,24 +182,62 @@
 
             <v-col cols="12" class="d-flex justify-end">
               <v-btn type="submit" color="primary" :loading="saving" :disabled="loading">
-                Save Settings
+                Save Color & Style Settings
               </v-btn>
             </v-col>
           </template>
         </v-row>
       </v-form>
+
+      <!-- Preview Section -->
+      <v-divider class="my-6"></v-divider>
+      <h3 class="mb-4">Live Preview (Approximate)</h3>
+      <v-card 
+        elevation="3"
+        class="pa-5 mx-auto"
+        max-width="500px"
+        :style="previewStyle"
+        >
+        <div class="text-center mb-4">
+          <img 
+            v-if="settings.logoUrl" 
+            :src="settings.logoUrl" 
+            alt="Logo Preview" 
+            style="max-height: 60px; max-width: 150px; object-fit: contain;"
+            class="mb-3"
+          >
+          <div v-else style="height: 60px; display: flex; align-items: center; justify-content: center; color: var(--preview-text-color);" class="mb-3">[Your Logo Here]</div>
+          <h4 :style="{ color: 'var(--preview-text-color)', fontFamily: settings.fontFamily || 'inherit' }" class="text-h5">
+            Book a Meeting
+          </h4>
+          <p :style="{ color: 'var(--preview-text-color)', opacity: 0.8, fontFamily: settings.fontFamily || 'inherit' }">
+            Select a date and time
+          </p>
+        </div>
+        <v-btn :color="settings.primaryColor" block class="mb-2">
+            Example Button (Primary)
+        </v-btn>
+         <v-btn :color="settings.secondaryColor" variant="outlined" block>
+            Example Button (Secondary)
+        </v-btn>
+        <!-- Add more preview elements as needed -->
+      </v-card>
+
     </v-card>
   </v-container>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import BrandingService from '@/services/BrandingService';
 
 const loading = ref(true);
 const saving = ref(false);
 const error = ref(null);
 const successMessage = ref(null);
+const selectedLogoFile = ref(null);
+const uploadingLogo = ref(false);
+const logoUploadError = ref(null);
 
 // Default settings structure
 const settings = reactive({
@@ -174,29 +257,28 @@ onMounted(async () => {
   loading.value = true;
   error.value = null;
   successMessage.value = null;
+  logoUploadError.value = null;
   try {
     const response = await BrandingService.getSettings();
-    // Access the nested 'data' object from the response
-    const fetchedData = response.data?.data; 
+    // Use optional chaining and nullish coalescing
+    const fetchedData = response.data?.data ?? response.data ?? null;
 
     // Explicitly assign fetched data to reactive state if available
     if (fetchedData && typeof fetchedData === 'object') {
         // console.log('Fetched branding data (actual settings):', fetchedData); // Removed diagnostic log
-
-        settings.logoUrl = fetchedData.logoUrl || '';
-        settings.primaryColor = fetchedData.primaryColor || '#1976D2';
-        settings.secondaryColor = fetchedData.secondaryColor || '#424242';
-        settings.backgroundColor = fetchedData.backgroundColor || '#FFFFFF';
-        settings.textColor = fetchedData.textColor || '#000000';
-        settings.fontFamily = fetchedData.fontFamily || '';
-        settings.customCss = fetchedData.customCss || '';
-        // settings._id = fetchedData.id || null; // id field is present
-        // settings.userId = fetchedData.userId || null;
+        settings.logoUrl = fetchedData.logoUrl ?? '';
+        settings.primaryColor = fetchedData.primaryColor ?? '#1976D2';
+        settings.secondaryColor = fetchedData.secondaryColor ?? '#424242';
+        settings.backgroundColor = fetchedData.backgroundColor ?? '#FFFFFF';
+        settings.textColor = fetchedData.textColor ?? '#000000';
+        settings.fontFamily = fetchedData.fontFamily ?? '';
+        settings.customCss = fetchedData.customCss ?? '';
+        // No need to set _id or userId on the reactive settings for update
 
     } else {
         // Check if the response was successful but data was missing/null
         if (response.data?.success) {
-            console.log('API reported success, but no branding data found in response.data.data');
+            console.log('API reported success, but no branding data found in response data property');
         } else {
             console.log('No existing branding data found, using defaults.');
         }
@@ -217,18 +299,27 @@ onMounted(async () => {
   }
 });
 
-// Save settings
+// Save settings (for colors, fonts, CSS - logo is handled separately)
 const saveSettings = async () => {
   saving.value = true;
   error.value = null;
   successMessage.value = null;
 
-  // Prepare data to send (exclude internal fields like _id, userId)
-  const { _id, userId, ...updateData } = settings;
+  // Prepare data to send (exclude logoUrl, _id, userId)
+  const { _id, userId, logoUrl, ...updateData } = settings;
+
+  // If logoUrl wasn't fetched (e.g., new user), don't send null/empty
+  if (settings.logoUrl === '') {
+    // Backend should handle missing logoUrl if needed, but we prevent sending it if it was never set
+  } else {
+     // Include logoUrl only if it has a value (set by fetch or upload)
+     // updateData.logoUrl = settings.logoUrl;
+     // Decision: Let backend keep existing logoUrl if not provided in PUT
+  }
 
   try {
     await BrandingService.updateSettings(updateData);
-    successMessage.value = 'Branding settings saved successfully!';
+    successMessage.value = 'Color and style settings saved successfully!';
     // Optionally re-fetch data or update local state if PUT returns updated object
   } catch (err) {
     console.error('Error saving branding settings:', err);
@@ -241,6 +332,47 @@ const saveSettings = async () => {
     }
   }
 };
+
+// Handle Logo Upload
+const handleLogoUpload = async () => {
+  if (!selectedLogoFile.value || !selectedLogoFile.value[0]) {
+    // No file selected or selection cleared
+    return;
+  }
+
+  const file = selectedLogoFile.value[0];
+  uploadingLogo.value = true;
+  logoUploadError.value = null;
+  successMessage.value = null; // Clear previous messages
+
+  try {
+    const response = await BrandingService.uploadLogo(file);
+    if (response.data?.success && response.data?.logoUrl) {
+      settings.logoUrl = response.data.logoUrl; // Update the displayed URL
+      successMessage.value = 'Logo uploaded successfully!';
+      selectedLogoFile.value = null; // Clear file input
+    } else {
+        logoUploadError.value = response.data?.error || 'Failed to upload logo. Unknown error.';
+    }
+  } catch (err) {
+    console.error('Error uploading logo:', err);
+    logoUploadError.value = err.response?.data?.error || 'Failed to upload logo. Please check file type/size and try again.';
+  } finally {
+    uploadingLogo.value = false;
+     if (successMessage.value) {
+       setTimeout(() => { successMessage.value = null; }, 5000);
+     }
+     // Don't clear error message immediately
+  }
+};
+
+// Computed style for preview
+const previewStyle = computed(() => ({
+  backgroundColor: settings.backgroundColor || '#FFFFFF',
+  '--preview-text-color': settings.textColor || '#000000', // Use CSS variable for text color
+  color: settings.textColor || '#000000' // Set default text color for the card itself
+}));
+
 </script>
 
 <style scoped>

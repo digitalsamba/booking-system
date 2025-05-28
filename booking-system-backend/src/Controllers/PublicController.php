@@ -14,17 +14,21 @@ use App\Models\BookingModel; // Correct import for BookingModel
 use App\Utils\Response;
 use App\Utils\Email\EmailServiceFactory;
 use MongoDB\BSON\ObjectId;
+use App\Services\BrandingService;
+use App\Utils\MongoDBHelper;
 
 class PublicController extends BaseController {
     private $userModel;
     private $availabilityModel;
     private $bookingModel;
+    private $brandingService;
     // We don't need a separate providerModel property - userModel is sufficient
     
     public function __construct() {
         $this->userModel = new UserModel();
         $this->availabilityModel = new AvailabilityModel();
         $this->bookingModel = new BookingModel(); // Initialize BookingModel properly
+        $this->brandingService = new BrandingService(); // Add BrandingService initialization
         // No need to initialize ProviderModel - userModel is already initialized
         error_log("PUBLIC CONTROLLER: Constructor initialized with all models");
     }
@@ -595,9 +599,69 @@ class PublicController extends BaseController {
         $responseData = [
             'username' => $provider['username'],
             'display_name' => $provider['display_name'] ?? $provider['username'],
+            'userId' => (string)$provider['_id'],
             // Add other public fields as needed, e.g., profile picture, description
         ];
         
         Response::json($responseData);
+    }
+
+    /**
+     * Get public branding settings for a specific provider by User ID.
+     * @param string $userId Provider's User ID from route parameter.
+     */
+    public function getBrandingSettings(string $userId)
+    {
+        error_log("[PublicController::getBrandingSettings] Request for userId: {$userId}");
+
+        // Validate ObjectId format using try-catch
+        try {
+            new ObjectId($userId);
+            // If constructor doesn't throw, format is valid
+        } catch (\MongoDB\Driver\Exception\InvalidArgumentException $e) {
+            error_log("[PublicController::getBrandingSettings] Invalid userId format: {$userId}");
+            Response::json(['error' => 'Invalid provider ID format'], 400);
+            return;
+        } catch (\Exception $e) { // Catch other potential errors during validation
+             error_log("[PublicController::getBrandingSettings] Unexpected error validating userId {$userId}: " . $e->getMessage());
+             Response::json(['error' => 'Error validating provider ID'], 500);
+             return;
+        }
+
+        // Use the existing BrandingService
+        // Ensure BrandingService is instantiated (should be in constructor)
+        if (!isset($this->brandingService)) {
+            // This ideally shouldn't happen if constructor is correct
+            error_log("[PublicController::getBrandingSettings] BrandingService not initialized!");
+            $this->brandingService = new \App\Services\BrandingService(); 
+        }
+
+        try {
+            $rawSettings = $this->brandingService->getBrandingSettings($userId);
+
+            if (!$rawSettings) {
+                // It's okay if settings don't exist, return empty or default indicator?
+                // For now, return 404 like the authenticated endpoint
+                error_log("[PublicController::getBrandingSettings] No settings found for userId: {$userId}");
+                Response::json(['message' => 'Branding settings not found for this provider'], 404);
+                return;
+            }
+
+            // Format the settings using the helper - reuse logic from BrandingController
+            $settings = MongoDBHelper::formatForApi($rawSettings);
+            // Ensure userId is string (though we fetched by it)
+            if (isset($settings['userId']) && $settings['userId'] instanceof \MongoDB\BSON\ObjectId) {
+                 $settings['userId'] = (string) $settings['userId'];
+            }
+
+            // Only return publicly relevant fields (exclude internal stuff if any)
+            // For now, return all fetched fields as the authenticated endpoint does
+            error_log("[PublicController::getBrandingSettings] Returning settings for userId: {$userId}");
+            Response::json($settings);
+
+        } catch (\Exception $e) {
+            error_log('[PublicController::getBrandingSettings] Error fetching settings for userId ' . $userId . ': ' . $e->getMessage());
+            Response::json(['error' => 'Internal Server Error retrieving branding settings'], 500);
+        }
     }
 }

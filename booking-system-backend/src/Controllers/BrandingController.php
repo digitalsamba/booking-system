@@ -97,5 +97,46 @@ class BrandingController extends BaseController // Extend BaseController
         }
     }
 
+    /**
+     * Handle logo upload for the authenticated user.
+     */
+    public function uploadLogo(): void
+    {
+        try {
+            $userId = $this->getUserId();
+            if (!$userId) {
+                Response::json(['error' => 'Unauthorized'], 401);
+                return;
+            }
+
+            // Check if file was uploaded
+            if (empty($_FILES['logoFile'])) {
+                error_log("[BrandingController::uploadLogo] No logoFile found in _FILES for user: {$userId}");
+                Response::json(['error' => "No file uploaded or incorrect field name ('logoFile' expected)."], 400);                return;
+            }
+
+            $file = $_FILES['logoFile'];
+            error_log("[BrandingController::uploadLogo] Received file: " . json_encode($file));
+
+            // Basic check for upload errors
+            if ($file['error'] !== UPLOAD_ERR_OK) {
+                error_log("[BrandingController::uploadLogo] File upload error code: {$file['error']} for user: {$userId}");
+                Response::json(['error' => 'File upload failed with error code: ' . $file['error']], 500);
+                return;
+            }
+
+            $result = $this->brandingService->handleLogoUpload($userId, $file);
+
+            if ($result['success']) {
+                Response::json(['message' => 'Logo uploaded successfully', 'logoUrl' => $result['logoUrl']]);
+            } else {
+                Response::json(['error' => $result['error']], $result['status'] ?? 500);
+            }
+        } catch (\Exception $e) {
+            error_log('[BrandingController::uploadLogo] Error: ' . $e->getMessage());
+            Response::json(['error' => 'Internal Server Error'], 500);
+        }
+    }
+
     // TODO: Add endpoint for handling logo uploads (POST /api/branding/logo ?)
 } 
