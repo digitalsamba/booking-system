@@ -26,8 +26,8 @@
               <v-label>Logo</v-label>
               <!-- Logo Preview -->
               <v-img
-                v-if="settings.logoUrl"
-                :src="settings.logoUrl"
+                v-if="fullLogoUrl"
+                :src="fullLogoUrl"
                 :alt="'Current Logo'"
                 max-height="100"
                 max-width="250"
@@ -200,8 +200,8 @@
         >
         <div class="text-center mb-4">
           <img 
-            v-if="settings.logoUrl" 
-            :src="settings.logoUrl" 
+            v-if="fullLogoUrl" 
+            :src="fullLogoUrl" 
             alt="Logo Preview" 
             style="max-height: 60px; max-width: 150px; object-fit: contain;"
             class="mb-3"
@@ -230,6 +230,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
 import BrandingService from '@/services/BrandingService';
+import { API_URL } from '@/config';
 
 const loading = ref(true);
 const saving = ref(false);
@@ -372,6 +373,20 @@ const previewStyle = computed(() => ({
   '--preview-text-color': settings.textColor || '#000000', // Use CSS variable for text color
   color: settings.textColor || '#000000' // Set default text color for the card itself
 }));
+
+// Computed property for full logo URL
+const fullLogoUrl = computed(() => {
+  if (!settings.logoUrl) return null;
+  
+  // If it's already a full URL, return as-is
+  if (settings.logoUrl.startsWith('http')) {
+    return settings.logoUrl;
+  }
+  
+  // Convert API URL to base URL and append the relative path
+  const baseUrl = API_URL.endsWith('/api') ? API_URL.slice(0, -4) : API_URL;
+  return baseUrl + settings.logoUrl;
+});
 
 </script>
 

@@ -19,6 +19,37 @@ use App\Controllers\EmailController;
 // The file MUST return a function that accepts a RouteCollector
 return function(RouteCollector $r) {
 
+    // Static file serving for uploads (PHP dev server workaround)
+    $r->addRoute('GET', '/uploads/{path:.+}', function($vars) {
+        $filePath = __DIR__ . '/../public/uploads/' . $vars['path'];
+        
+        if (!file_exists($filePath) || !is_file($filePath)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'File not found']);
+            return;
+        }
+        
+        // Get file extension and set appropriate MIME type
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $mimeTypes = [
+            'png' => 'image/png',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'gif' => 'image/gif',
+            'svg' => 'image/svg+xml',
+            'webp' => 'image/webp'
+        ];
+        
+        $mimeType = $mimeTypes[$ext] ?? 'application/octet-stream';
+        
+        header('Content-Type: ' . $mimeType);
+        header('Content-Length: ' . filesize($filePath));
+        header('Cache-Control: public, max-age=31536000'); // Cache for 1 year
+        
+        readfile($filePath);
+        exit;
+    });
+
     // Test route
     $r->addRoute('GET', '/test', function() {
         header('Content-Type: application/json');
