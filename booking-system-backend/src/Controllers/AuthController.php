@@ -93,7 +93,7 @@ class AuthController extends BaseController {
                 'user' => [
                     'id' => isset($user['_id']) ? (string)$user['_id'] : '',
                     'username' => $user['username'],
-                    'email' => $user['email'],
+                    'email' => $user['email'] ?? null,
                     'role' => $user['role'] ?? 'user',
                     'display_name' => $user['display_name'] ?? $user['username'],
                     'team_id' => $user['team_id'] ?? '',
@@ -177,7 +177,7 @@ class AuthController extends BaseController {
             Response::json([
                 'id' => isset($user['_id']) ? (string)$user['_id'] : '',
                 'username' => $user['username'],
-                'email' => $user['email'],
+                'email' => $user['email'] ?? null,
                 'role' => $user['role'] ?? 'user',
                 'display_name' => $user['display_name'] ?? $user['username'],
                 'profile' => $user['profile'] ?? [],
@@ -238,7 +238,7 @@ class AuthController extends BaseController {
                     'user' => [
                         'id' => isset($user['_id']) ? (string)$user['_id'] : '',
                         'username' => $user['username'],
-                        'email' => $user['email'],
+                        'email' => $user['email'] ?? null,
                         'role' => $user['role'] ?? 'user',
                         'display_name' => $user['display_name'] ?? $user['username'],
                         'profile' => $user['profile'] ?? [],

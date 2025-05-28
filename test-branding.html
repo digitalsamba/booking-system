@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Branding Upload</title>
+</head>
+<body>
+    <h1>Test Branding Feature</h1>
+    
+    <h2>1. Backend Status</h2>
+    <button onclick="testBackend()">Test Backend Connection</button>
+    <div id="backend-result"></div>
+    
+    <h2>2. Login (Required for branding)</h2>
+    <form id="login-form">
+        <input type="email" placeholder="Email" id="email" value="test@example.com">
+        <input type="password" placeholder="Password" id="password" value="password123">
+        <button type="submit">Login</button>
+    </form>
+    <div id="login-result"></div>
+    
+    <h2>3. Test Logo Upload</h2>
+    <input type="file" id="logo-file" accept="image/*">
+    <button onclick="uploadLogo()">Upload Logo</button>
+    <div id="upload-result"></div>
+    
+    <h2>4. Test Branding Settings</h2>
+    <button onclick="getBranding()">Get Current Settings</button>
+    <button onclick="updateBranding()">Update Settings</button>
+    <div id="branding-result"></div>
+
+    <script>
+        let authToken = localStorage.getItem('authToken');
+        
+        async function testBackend() {
+            try {
+                const response = await fetch('http://localhost:8000/ping');
+                const data = await response.json();
+                document.getElementById('backend-result').innerHTML = `✅ Backend: ${JSON.stringify(data)}`;
+            } catch (error) {
+                document.getElementById('backend-result').innerHTML = `❌ Backend Error: ${error.message}`;
+            }
+        }
+        
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await response.json();
+                
+                if (data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('authToken', authToken);
+                    document.getElementById('login-result').innerHTML = `✅ Login Success`;
+                } else {
+                    document.getElementById('login-result').innerHTML = `❌ Login Failed: ${data.error}`;
+                }
+            } catch (error) {
+                document.getElementById('login-result').innerHTML = `❌ Login Error: ${error.message}`;
+            }
+        });
+        
+        async function uploadLogo() {
+            const fileInput = document.getElementById('logo-file');
+            if (!fileInput.files[0]) {
+                alert('Please select a file');
+                return;
+            }
+            
+            if (!authToken) {
+                alert('Please login first');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('logoFile', fileInput.files[0]);
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/branding/logo', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    body: formData
+                });
+                const data = await response.json();
+                document.getElementById('upload-result').innerHTML = `Result: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                document.getElementById('upload-result').innerHTML = `❌ Upload Error: ${error.message}`;
+            }
+        }
+        
+        async function getBranding() {
+            if (!authToken) {
+                alert('Please login first');
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/branding', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                document.getElementById('branding-result').innerHTML = `Current Settings: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                document.getElementById('branding-result').innerHTML = `❌ Get Error: ${error.message}`;
+            }
+        }
+        
+        async function updateBranding() {
+            if (!authToken) {
+                alert('Please login first');
+                return;
+            }
+            
+            const testSettings = {
+                primaryColor: '#FF5722',
+                secondaryColor: '#4CAF50',
+                backgroundColor: '#F5F5F5',
+                textColor: '#333333',
+                fontFamily: 'Arial, sans-serif'
+            };
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/branding', {
+                    method: 'PUT',
+                    headers: { 
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testSettings)
+                });
+                const data = await response.json();
+                document.getElementById('branding-result').innerHTML = `Update Result: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                document.getElementById('branding-result').innerHTML = `❌ Update Error: ${error.message}`;
+            }
+        }
+        
+        // Auto-test backend on load
+        testBackend();
+    </script>
+</body>
+</html>
