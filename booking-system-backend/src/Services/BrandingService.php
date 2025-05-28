@@ -94,8 +94,19 @@ class BrandingService
         $baseUploadUrl = '/uploads/branding'; // Publicly accessible base URL
 
         // --- Validation ---
-        // Check file type
-        $fileMimeType = mime_content_type($file['tmp_name']);
+        // Check file type using finfo or fallback to $_FILES type
+        $fileMimeType = $file['type']; // Fallback to browser-provided type
+        if (function_exists('finfo_file')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {
+                $detectedType = finfo_file($finfo, $file['tmp_name']);
+                if ($detectedType) {
+                    $fileMimeType = $detectedType;
+                }
+                finfo_close($finfo);
+            }
+        }
+        
         if (!in_array($fileMimeType, $allowedMimeTypes)) {
             error_log("[BrandingService::handleLogoUpload] Invalid file type: {$fileMimeType} for user: {$userId}");
             return ['success' => false, 'error' => 'Invalid file type. Allowed types: JPG, PNG, GIF, SVG.', 'status' => 415];

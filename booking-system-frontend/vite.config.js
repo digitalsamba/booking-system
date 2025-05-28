@@ -25,10 +25,10 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       },
-      '/public': {
+      // Proxy specific public API endpoints, not the general /public route
+      '^/public/(availability|booking|user/.+|branding/.+)': {
         target: 'http://localhost:8000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/public/, '')
+        changeOrigin: true
       }
     },
     fs: {

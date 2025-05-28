@@ -55,8 +55,14 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/booking/:username',
+    path: '/public/:username',
     name: 'public-booking',
+    component: PublicBookingView,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/booking/:username',
+    name: 'booking',
     component: PublicBookingView,
     meta: { requiresAuth: false }
   }

@@ -21,7 +21,43 @@ if (!class_exists('\MongoDB\Client')) {
 }
 
 // Log the request for debugging
-error_log("Processing API request: " . $_SERVER['REQUEST_URI']);
+error_log("Processing request: " . $_SERVER['REQUEST_URI']);
+
+// Handle static file serving for uploads
+$requestUri = $_SERVER['REQUEST_URI'];
+if (strpos($requestUri, '/uploads/') === 0) {
+    $filePath = __DIR__ . $requestUri;
+    if (file_exists($filePath)) {
+        // Determine MIME type
+        $mimeType = mime_content_type($filePath);
+        if (!$mimeType) {
+            $extension = pathinfo($filePath, PATHINFO_EXTENSION);
+            $mimeTypes = [
+                'png' => 'image/png',
+                'jpg' => 'image/jpeg',
+                'jpeg' => 'image/jpeg',
+                'gif' => 'image/gif',
+                'svg' => 'image/svg+xml',
+                'pdf' => 'application/pdf'
+            ];
+            $mimeType = $mimeTypes[strtolower($extension)] ?? 'application/octet-stream';
+        }
+        
+        // Set appropriate headers
+        header('Content-Type: ' . $mimeType);
+        header('Content-Length: ' . filesize($filePath));
+        header('Cache-Control: public, max-age=3600'); // Cache for 1 hour
+        
+        // Output the file
+        readfile($filePath);
+        exit;
+    } else {
+        // File not found
+        header('HTTP/1.0 404 Not Found');
+        echo json_encode(['error' => 'File not found']);
+        exit;
+    }
+}
 
 // Autoload App classes
 spl_autoload_register(function ($class) {

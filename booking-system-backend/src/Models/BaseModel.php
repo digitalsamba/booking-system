@@ -30,8 +30,15 @@ class BaseModel {
             
             error_log("Attempting to connect to MongoDB at {$mongoHost}");
             
+            // Connection options with timeouts
+            $options = [
+                'serverSelectionTimeoutMS' => 5000, // 5 second timeout
+                'connectTimeoutMS' => 5000,
+                'socketTimeoutMS' => 5000
+            ];
+            
             // Connect to MongoDB
-            $this->client = new Client($mongoHost);
+            $this->client = new Client($mongoHost, [], $options);
             $this->database = $this->client->selectDatabase($mongoDb);
             $this->collection = $this->database->selectCollection($collectionName);
             

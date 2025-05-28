@@ -272,7 +272,7 @@ export default {
       brandingError.value = null;
       try {
         const response = await publicBookingService.getBrandingSettings(userId);
-        const fetchedData = response.data; // Assuming direct data return now
+        const fetchedData = response.data.data; // Fix: Use response.data.data to match API structure
         if (fetchedData && typeof fetchedData === 'object') {
             console.log('Fetched public branding settings:', fetchedData);
             brandingSettings.logoUrl = fetchedData.logoUrl ?? '';

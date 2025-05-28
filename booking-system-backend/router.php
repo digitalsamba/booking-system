@@ -72,6 +72,7 @@ error_log("FastRoute Dispatching: Method={$httpMethod}, URI='{$uri}'");
 
 // 3. Dispatch the route
 error_log("--> Attempting to dispatch URI: [" . $uri . "]"); // ADDED FOR DEBUGGING
+error_log("--> HTTP Method: [" . $httpMethod . "]"); // ADDED FOR DEBUGGING
 $routeInfo = $dispatcher->dispatch($httpMethod, $uri);
 
 // 4. Handle dispatch result
@@ -134,7 +135,17 @@ switch ($routeInfo[0]) {
             error_log("Stack Trace: \n" . $e->getTraceAsString());
             // Use a generic error in production
             $errorMsg = (defined('DEBUG') && DEBUG) ? $e->getMessage() : 'Internal Server Error';
-            Response::json(['error' => $errorMsg], 500);
+            
+            // Try to use Response::json if available
+            if (class_exists('App\Utils\Response')) {
+                Response::json(['error' => $errorMsg], 500);
+            } else {
+                // Fallback response
+                header('Content-Type: application/json');
+                http_response_code(500);
+                echo json_encode(['error' => $errorMsg]);
+                exit;
+            }
         }
         break;
 }
