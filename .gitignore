@@ -134,3 +134,12 @@ dist
 
 # cursor bits
 .cursor/
+
+# Project documentation (managed in Obsidian vault)
+PROJECT-STATUS.md
+ACTIVE-SESSION.md
+SESSION-*.md
+*-STATUS.md
+*-NOTES.md
+*-ISSUE-*.md
+BRANDING-*.md
