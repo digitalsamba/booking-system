@@ -21,62 +21,123 @@
 
           <!-- Settings Form (shown when not loading) -->
           <template v-else>
-            <!-- Logo Section (Moved to Top) -->
-            <v-col cols="12" md="6">
-              <v-label>Logo</v-label>
-              <!-- Logo Preview -->
-              <v-img
-                v-if="fullLogoUrl"
-                :src="fullLogoUrl"
-                :alt="'Current Logo'"
-                max-height="100"
-                max-width="250"
-                contain
-                class="mb-3 mt-1 elevation-1"
-                style="border: 1px solid #eee; background-color: #f9f9f9;"
-              ></v-img>
-              <v-alert v-else type="info" variant="tonal" dense class="mb-3 mt-1">
-                No logo set. Upload one below or paste a URL.
+            <!-- Logo Section (Improved with exclusive options) -->
+            <v-col cols="12">
+              <v-label class="text-h6 mb-3">Logo Configuration</v-label>
+              
+              <!-- Current Logo Preview -->
+              <v-card v-if="fullLogoUrl" outlined class="mb-4">
+                <v-card-text class="d-flex align-center">
+                  <v-img
+                    :src="fullLogoUrl"
+                    :alt="'Current Logo'"
+                    max-height="80"
+                    max-width="200"
+                    contain
+                    class="mr-4"
+                    style="border: 1px solid #eee; background-color: #f9f9f9;"
+                  ></v-img>
+                  <div>
+                    <div class="text-subtitle2 font-weight-bold">Current Logo</div>
+                    <div class="text-caption text-medium-emphasis">
+                      Source: {{ logoSource }}
+                    </div>
+                    <div class="text-caption text-medium-emphasis">
+                      {{ currentLogoUrl }}
+                    </div>
+                  </div>
+                </v-card-text>
+              </v-card>
+              
+              <v-alert v-else type="info" variant="tonal" dense class="mb-4">
+                No logo currently set. Choose an option below to add one.
               </v-alert>
 
-              <!-- Logo URL Input -->
-              <v-text-field
-                v-model="settings.logoUrl"
-                label="Logo URL"
-                placeholder="https://example.com/your-logo.png or upload below"
-                outlined
-                dense
-                hint="Paste a URL or upload a file. Upload will overwrite the URL."
-                persistent-hint
-                class="mb-3"
-              ></v-text-field>
+              <!-- Logo Method Selection -->
+              <v-radio-group 
+                v-model="logoMethod" 
+                @update:model-value="handleLogoMethodChange"
+                class="mb-4"
+              >
+                <template #label>
+                  <div class="text-subtitle1 font-weight-medium">Choose Logo Method</div>
+                </template>
+                <v-radio label="Upload a file from my computer" value="upload"></v-radio>
+                <v-radio label="Use a URL from the internet" value="url"></v-radio>
+              </v-radio-group>
 
-              <!-- Logo File Upload -->
-              <v-file-input
-                v-model="selectedLogoFile"
-                label="Upload Logo File"
-                accept="image/png, image/jpeg, image/gif, image/svg+xml"
-                outlined
-                dense
-                prepend-icon="mdi-camera"
-                :loading="uploadingLogo"
-                :disabled="uploadingLogo || loading"
-                @update:model-value="handleLogoUpload"
-                class="mb-2"
-                hide-details="auto" 
-              ></v-file-input>
-              <div class="v-messages__message text-caption mb-2" style="padding-left: 16px; padding-right: 16px;">
-                 Max 5MB. Allowed: JPG, PNG, GIF, SVG.
+              <!-- URL Input (only shown when URL method selected) -->
+              <v-expand-transition>
+                <div v-if="logoMethod === 'url'">
+                  <v-text-field
+                    v-model="logoUrlInput"
+                    label="Logo URL"
+                    placeholder="https://example.com/your-logo.png"
+                    outlined
+                    dense
+                    hint="Enter a complete URL to your logo image (JPG, PNG, GIF, SVG)"
+                    persistent-hint
+                    class="mb-3"
+                    @input="handleUrlInput"
+                    :error-messages="urlError ? [urlError] : []"
+                  >
+                    <template #append>
+                      <v-btn 
+                        v-if="logoUrlInput && logoUrlInput !== settings.logoUrl"
+                        @click="applyUrlLogo"
+                        size="small"
+                        color="primary"
+                        variant="text"
+                        :loading="applyingUrl"
+                      >
+                        Apply
+                      </v-btn>
+                    </template>
+                  </v-text-field>
+                </div>
+              </v-expand-transition>
+
+              <!-- File Upload (only shown when upload method selected) -->
+              <v-expand-transition>
+                <div v-if="logoMethod === 'upload'">
+                  <v-file-input
+                    v-model="selectedLogoFile"
+                    label="Select Logo File"
+                    accept="image/png, image/jpeg, image/gif, image/svg+xml"
+                    outlined
+                    dense
+                    prepend-icon="mdi-camera"
+                    :loading="uploadingLogo"
+                    :disabled="uploadingLogo || loading"
+                    @update:model-value="handleLogoUpload"
+                    class="mb-2"
+                    hide-details="auto" 
+                  ></v-file-input>
+                  <div class="v-messages__message text-caption mb-2" style="padding-left: 16px; padding-right: 16px;">
+                     Max 5MB. Supported formats: JPG, PNG, GIF, SVG.
+                  </div>
+
+                  <!-- Logo Upload Error -->
+                  <v-alert v-if="logoUploadError" type="error" dense outlined class="mt-2 mb-4">
+                    {{ logoUploadError }}
+                  </v-alert>
+                </div>
+              </v-expand-transition>
+
+              <!-- Remove Logo Option -->
+              <div v-if="fullLogoUrl" class="mt-2 mb-4">
+                <v-btn 
+                  @click="removeLogo"
+                  color="error"
+                  variant="outlined"
+                  size="small"
+                  prepend-icon="mdi-delete"
+                  :loading="removingLogo"
+                >
+                  Remove Current Logo
+                </v-btn>
               </div>
-
-              <!-- Logo Upload Error -->
-              <v-alert v-if="logoUploadError" type="error" dense outlined class="mt-2 mb-4">
-                {{ logoUploadError }}
-              </v-alert>
             </v-col>
-
-            <!-- Placeholder Column if needed for layout -->
-            <v-col cols="12" md="6"></v-col> 
 
             <v-col cols="12">
               <v-divider class="my-4"></v-divider>
@@ -191,7 +252,7 @@
 
       <!-- Preview Section -->
       <v-divider class="my-6"></v-divider>
-      <h3 class="mb-4">Live Preview (Approximate)</h3>
+      <h3 class="mb-4">Live Preview</h3>
       <v-card 
         elevation="3"
         class="pa-5 mx-auto"
@@ -220,7 +281,6 @@
          <v-btn :color="settings.secondaryColor" variant="outlined" block>
             Example Button (Secondary)
         </v-btn>
-        <!-- Add more preview elements as needed -->
       </v-card>
 
     </v-card>
@@ -228,7 +288,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed, watch } from 'vue';
 import BrandingService from '@/services/BrandingService';
 import { API_URL } from '@/config';
 
@@ -239,18 +299,48 @@ const successMessage = ref(null);
 const selectedLogoFile = ref(null);
 const uploadingLogo = ref(false);
 const logoUploadError = ref(null);
+const removingLogo = ref(false);
+
+// Logo method selection
+const logoMethod = ref('url'); // 'url' or 'upload'
+const logoUrlInput = ref('');
+const urlError = ref(null);
+const applyingUrl = ref(false);
 
 // Default settings structure
 const settings = reactive({
   _id: null,
   userId: null,
   logoUrl: '',
-  primaryColor: '#1976D2', // Default Vuetify primary blue
-  secondaryColor: '#424242', // Default Vuetify secondary grey
+  primaryColor: '#1976D2',
+  secondaryColor: '#424242',
   backgroundColor: '#FFFFFF',
   textColor: '#000000',
   fontFamily: '',
   customCss: '',
+});
+
+// Computed properties for logo management
+const currentLogoUrl = computed(() => {
+  return settings.logoUrl || 'No logo set';
+});
+
+const logoSource = computed(() => {
+  if (!settings.logoUrl) return 'None';
+  if (settings.logoUrl.startsWith('http')) return 'External URL';
+  if (settings.logoUrl.startsWith('/uploads/')) return 'Uploaded File';
+  return 'URL';
+});
+
+const fullLogoUrl = computed(() => {
+  if (!settings.logoUrl) return null;
+  
+  if (settings.logoUrl.startsWith('http')) {
+    return settings.logoUrl;
+  }
+  
+  const baseUrl = API_URL.endsWith('/api') ? API_URL.slice(0, -4) : API_URL;
+  return baseUrl + settings.logoUrl;
 });
 
 // Fetch settings when component mounts
@@ -259,46 +349,81 @@ onMounted(async () => {
   error.value = null;
   successMessage.value = null;
   logoUploadError.value = null;
+  urlError.value = null;
+  
   try {
     const response = await BrandingService.getSettings();
-    // Use optional chaining and nullish coalescing
     const fetchedData = response.data?.data ?? response.data ?? null;
 
-    // Explicitly assign fetched data to reactive state if available
     if (fetchedData && typeof fetchedData === 'object') {
-        // console.log('Fetched branding data (actual settings):', fetchedData); // Removed diagnostic log
-        settings.logoUrl = fetchedData.logoUrl ?? '';
-        settings.primaryColor = fetchedData.primaryColor ?? '#1976D2';
-        settings.secondaryColor = fetchedData.secondaryColor ?? '#424242';
-        settings.backgroundColor = fetchedData.backgroundColor ?? '#FFFFFF';
-        settings.textColor = fetchedData.textColor ?? '#000000';
-        settings.fontFamily = fetchedData.fontFamily ?? '';
-        settings.customCss = fetchedData.customCss ?? '';
-        // No need to set _id or userId on the reactive settings for update
+      settings.logoUrl = fetchedData.logoUrl ?? '';
+      settings.primaryColor = fetchedData.primaryColor ?? '#1976D2';
+      settings.secondaryColor = fetchedData.secondaryColor ?? '#424242';
+      settings.backgroundColor = fetchedData.backgroundColor ?? '#FFFFFF';
+      settings.textColor = fetchedData.textColor ?? '#000000';
+      settings.fontFamily = fetchedData.fontFamily ?? '';
+      settings.customCss = fetchedData.customCss ?? '';
 
+      // Set initial values and method
+      logoUrlInput.value = settings.logoUrl;
+      logoMethod.value = settings.logoUrl.startsWith('/uploads/') ? 'upload' : 'url';
     } else {
-        // Check if the response was successful but data was missing/null
-        if (response.data?.success) {
-            console.log('API reported success, but no branding data found in response data property');
-        } else {
-            console.log('No existing branding data found, using defaults.');
-        }
+      if (response.data?.success) {
+        console.log('API reported success, but no branding data found');
+      } else {
+        console.log('No existing branding data found, using defaults.');
+      }
     }
 
   } catch (err) {
     if (err.response && err.response.status === 404) {
-        error.value = 'No branding settings found. Using default values. Save to create settings.';
-        console.log('GET /api/branding returned 404.');
+      error.value = 'No branding settings found. Using default values. Save to create settings.';
     } else {
-        console.error('Error fetching branding settings:', err);
-        // Check if error response has a nested data structure
-        const errorMsg = err.response?.data?.data?.error || err.response?.data?.error || 'Failed to load branding settings. Please try again.';
-        error.value = errorMsg;
+      console.error('Error fetching branding settings:', err);
+      const errorMsg = err.response?.data?.data?.error || err.response?.data?.error || 'Failed to load branding settings. Please try again.';
+      error.value = errorMsg;
     }
   } finally {
     loading.value = false;
   }
 });
+
+// Handle logo method change
+const handleLogoMethodChange = (newMethod) => {
+  selectedLogoFile.value = null;
+  logoUploadError.value = null;
+  urlError.value = null;
+  
+  if (newMethod === 'url') {
+    logoUrlInput.value = settings.logoUrl;
+  }
+};
+
+// Handle URL input
+const handleUrlInput = () => {
+  urlError.value = null;
+  if (logoUrlInput.value && !logoUrlInput.value.startsWith('http')) {
+    urlError.value = 'URL must start with http:// or https://';
+  }
+};
+
+// Apply URL logo
+const applyUrlLogo = async () => {
+  if (!logoUrlInput.value || urlError.value) return;
+  
+  applyingUrl.value = true;
+  try {
+    await BrandingService.updateSettings({ logoUrl: logoUrlInput.value });
+    settings.logoUrl = logoUrlInput.value;
+    successMessage.value = 'Logo URL updated successfully!';
+    setTimeout(() => { successMessage.value = null; }, 5000);
+  } catch (err) {
+    console.error('Error updating logo URL:', err);
+    error.value = err.response?.data?.error || 'Failed to update logo URL. Please try again.';
+  } finally {
+    applyingUrl.value = false;
+  }
+};
 
 // Save settings (for colors, fonts, CSS - logo is handled separately)
 const saveSettings = async () => {
@@ -306,28 +431,16 @@ const saveSettings = async () => {
   error.value = null;
   successMessage.value = null;
 
-  // Prepare data to send (exclude logoUrl, _id, userId)
   const { _id, userId, logoUrl, ...updateData } = settings;
-
-  // If logoUrl wasn't fetched (e.g., new user), don't send null/empty
-  if (settings.logoUrl === '') {
-    // Backend should handle missing logoUrl if needed, but we prevent sending it if it was never set
-  } else {
-     // Include logoUrl only if it has a value (set by fetch or upload)
-     // updateData.logoUrl = settings.logoUrl;
-     // Decision: Let backend keep existing logoUrl if not provided in PUT
-  }
 
   try {
     await BrandingService.updateSettings(updateData);
     successMessage.value = 'Color and style settings saved successfully!';
-    // Optionally re-fetch data or update local state if PUT returns updated object
   } catch (err) {
     console.error('Error saving branding settings:', err);
     error.value = err.response?.data?.error || 'Failed to save settings. Please try again.';
   } finally {
     saving.value = false;
-    // Hide success message after a few seconds
     if (successMessage.value) {
       setTimeout(() => { successMessage.value = null; }, 5000);
     }
@@ -337,64 +450,74 @@ const saveSettings = async () => {
 // Handle Logo Upload
 const handleLogoUpload = async () => {
   if (!selectedLogoFile.value || !selectedLogoFile.value[0]) {
-    // No file selected or selection cleared
     return;
   }
 
   const file = selectedLogoFile.value[0];
   uploadingLogo.value = true;
   logoUploadError.value = null;
-  successMessage.value = null; // Clear previous messages
+  successMessage.value = null;
 
   try {
     const response = await BrandingService.uploadLogo(file);
     if (response.data?.success && response.data?.logoUrl) {
-      settings.logoUrl = response.data.logoUrl; // Update the displayed URL
+      settings.logoUrl = response.data.logoUrl;
+      logoUrlInput.value = response.data.logoUrl;
       successMessage.value = 'Logo uploaded successfully!';
-      selectedLogoFile.value = null; // Clear file input
+      selectedLogoFile.value = null;
     } else {
-        logoUploadError.value = response.data?.error || 'Failed to upload logo. Unknown error.';
+      logoUploadError.value = response.data?.error || 'Failed to upload logo. Unknown error.';
     }
   } catch (err) {
     console.error('Error uploading logo:', err);
     logoUploadError.value = err.response?.data?.error || 'Failed to upload logo. Please check file type/size and try again.';
   } finally {
     uploadingLogo.value = false;
-     if (successMessage.value) {
-       setTimeout(() => { successMessage.value = null; }, 5000);
-     }
-     // Don't clear error message immediately
+    if (successMessage.value) {
+      setTimeout(() => { successMessage.value = null; }, 5000);
+    }
+  }
+};
+
+// Remove logo
+const removeLogo = async () => {
+  removingLogo.value = true;
+  try {
+    await BrandingService.updateSettings({ logoUrl: '' });
+    settings.logoUrl = '';
+    logoUrlInput.value = '';
+    successMessage.value = 'Logo removed successfully!';
+    setTimeout(() => { successMessage.value = null; }, 5000);
+  } catch (err) {
+    console.error('Error removing logo:', err);
+    error.value = err.response?.data?.error || 'Failed to remove logo. Please try again.';
+  } finally {
+    removingLogo.value = false;
   }
 };
 
 // Computed style for preview
 const previewStyle = computed(() => ({
   backgroundColor: settings.backgroundColor || '#FFFFFF',
-  '--preview-text-color': settings.textColor || '#000000', // Use CSS variable for text color
-  color: settings.textColor || '#000000' // Set default text color for the card itself
+  '--preview-text-color': settings.textColor || '#000000',
+  color: settings.textColor || '#000000'
 }));
-
-// Computed property for full logo URL
-const fullLogoUrl = computed(() => {
-  if (!settings.logoUrl) return null;
-  
-  // If it's already a full URL, return as-is
-  if (settings.logoUrl.startsWith('http')) {
-    return settings.logoUrl;
-  }
-  
-  // Convert API URL to base URL and append the relative path
-  const baseUrl = API_URL.endsWith('/api') ? API_URL.slice(0, -4) : API_URL;
-  return baseUrl + settings.logoUrl;
-});
 
 </script>
 
 <style scoped>
-/* Add any component-specific styles here */
 .v-label {
   margin-bottom: 8px;
   display: block;
   font-weight: 500;
 }
-</style> 
+
+.v-radio-group :deep(.v-selection-control-group) {
+  margin-top: 8px;
+}
+
+.v-expand-transition-enter-active,
+.v-expand-transition-leave-active {
+  transition: all 0.3s ease;
+}
+</style>
