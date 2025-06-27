@@ -90,9 +90,19 @@ spl_autoload_register(function ($class) {
 
 // Handle CORS preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    // Use configured CORS settings if available
+    if (defined('ALLOW_ORIGIN')) {
+        header('Access-Control-Allow-Origin: ' . ALLOW_ORIGIN);
+        header('Access-Control-Allow-Methods: ' . ALLOW_METHODS);
+        header('Access-Control-Allow-Headers: ' . ALLOW_HEADERS);
+    } else {
+        // Fallback if constants not defined
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    }
+    header('Access-Control-Max-Age: 86400');
+    http_response_code(204);
     exit;
 }
 

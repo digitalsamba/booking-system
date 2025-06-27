@@ -13,7 +13,48 @@ use PHPMailer\PHPMailer\Exception;
  */
 class SmtpEmailProvider extends BaseEmailProvider {
     /**
-     * Send a simple email
+     * Send a simple email (implementing EmailService interface)
+     *
+     * @param string $to Recipient email address
+     * @param string $subject Email subject
+     * @param string $textBody Email body (plain text)
+     * @param string|null $htmlBody Optional HTML body
+     * @param string|null $from Optional sender email
+     * @param string|null $fromName Optional sender name
+     * @param string|null $replyTo Optional reply-to email
+     * @param array $attachments Optional array of attachments
+     * @return bool Success status
+     */
+    public function sendEmail(string $to, string $subject, string $textBody, ?string $htmlBody = null, ?string $from = null, ?string $fromName = null, ?string $replyTo = null, array $attachments = []): bool {
+        return $this->send($to, $subject, $textBody, $htmlBody, $attachments, [
+            'from' => $from,
+            'fromName' => $fromName,
+            'replyTo' => $replyTo
+        ]);
+    }
+    
+    /**
+     * Send email using a template (implementing EmailService interface)
+     *
+     * @param string $to Recipient email address
+     * @param string $templateId ID or name of the template to use
+     * @param array $templateData Variables to pass to the template
+     * @param string|null $from Optional sender email
+     * @param string|null $fromName Optional sender name
+     * @param string|null $replyTo Optional reply-to email
+     * @param array $attachments Optional array of attachments
+     * @return bool Success status
+     */
+    public function sendTemplateEmail(string $to, string $templateId, array $templateData = [], ?string $from = null, ?string $fromName = null, ?string $replyTo = null, array $attachments = []): bool {
+        // Render the template
+        $htmlBody = $this->renderTemplate($templateId, $templateData);
+        $textBody = strip_tags($htmlBody); // Simple text version
+        
+        return $this->sendEmail($to, $templateData['subject'] ?? 'Notification', $textBody, $htmlBody, $from, $fromName, $replyTo, $attachments);
+    }
+    
+    /**
+     * Internal send method
      *
      * @param string $to Recipient email address
      * @param string $subject Email subject
@@ -23,7 +64,7 @@ class SmtpEmailProvider extends BaseEmailProvider {
      * @param array $options Additional options
      * @return bool Success status
      */
-    public function send(string $to, string $subject, string $body, string $htmlBody = null, array $attachments = [], array $options = []): bool {
+    protected function send(string $to, string $subject, string $body, string $htmlBody = null, array $attachments = [], array $options = []): bool {
         // Create a new PHPMailer instance
         $mail = new PHPMailer(true);
         

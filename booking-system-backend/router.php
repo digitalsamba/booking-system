@@ -25,17 +25,17 @@ if (defined('DEBUG') && DEBUG) {
 
 // --- CORS Preflight Handling ---
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    // Set CORS headers (Consider making origin more specific in production)
-    header('Access-Control-Allow-Origin: *'); 
-    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+    // Set CORS headers using environment configuration
+    header('Access-Control-Allow-Origin: ' . ALLOW_ORIGIN); 
+    header('Access-Control-Allow-Methods: ' . ALLOW_METHODS);
+    header('Access-Control-Allow-Headers: ' . ALLOW_HEADERS);
     header('Access-Control-Max-Age: 86400'); // Cache preflight for 24 hours
     http_response_code(204); // No Content for OPTIONS response
     exit;
 }
 
-// Set default CORS header for actual requests (adjust origin as needed)
-header('Access-Control-Allow-Origin: *');
+// Set default CORS header for actual requests
+header('Access-Control-Allow-Origin: ' . ALLOW_ORIGIN);
 
 // --- FastRoute Dispatching ---
 

@@ -3,9 +3,9 @@
  * Bootstrap file for loading environment variables
  */
 
-// Set error reporting
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// Set error reporting - disable display for production
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 
 // Require composer autoloader
@@ -20,6 +20,9 @@ use Dotenv\Dotenv;
 
 // Set base path (used by some functions)
 define('BASE_PATH', __DIR__);
+
+// Load main configuration
+require_once __DIR__ . '/config/config.php';
 
 // Load .env configuration using our custom loader
 EmailConfig::load();
@@ -42,9 +45,15 @@ date_default_timezone_set('UTC');
 error_log("Bootstrap: Loading application configuration");
 
 // Create necessary constant definitions
-define('APP_ROOT', __DIR__);
-define('APP_ENV', EmailConfig::get('APP_ENV', 'production'));
-define('DEBUG', filter_var(EmailConfig::get('DEBUG', false), FILTER_VALIDATE_BOOLEAN));
+if (!defined('APP_ROOT')) {
+    define('APP_ROOT', __DIR__);
+}
+if (!defined('APP_ENV')) {
+    define('APP_ENV', EmailConfig::get('APP_ENV', 'production'));
+}
+if (!defined('DEBUG')) {
+    define('DEBUG', filter_var(EmailConfig::get('DEBUG', false), FILTER_VALIDATE_BOOLEAN));
+}
 
 // Create helper function to get config values
 if (!function_exists('config')) {
@@ -108,5 +117,9 @@ if (file_exists($envFile)) {
 }
 
 // Define base paths
-define('CONFIG_PATH', BASE_PATH . DIRECTORY_SEPARATOR . 'config');
-define('SRC_PATH', BASE_PATH . DIRECTORY_SEPARATOR . 'src'); 
+if (!defined('CONFIG_PATH')) {
+    define('CONFIG_PATH', BASE_PATH . DIRECTORY_SEPARATOR . 'config');
+}
+if (!defined('SRC_PATH')) {
+    define('SRC_PATH', BASE_PATH . DIRECTORY_SEPARATOR . 'src');
+} 
