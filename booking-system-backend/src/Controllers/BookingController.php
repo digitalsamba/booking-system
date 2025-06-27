@@ -9,12 +9,14 @@ namespace App\Controllers;
 
 use App\Models\BookingModel;
 use App\Models\AvailabilityModel;
+use App\Models\UserModel; // Use UserModel instead of ProviderModel // Added ProviderModel
 use App\Utils\Response;
-use App\Utils\JwtAuth; // Change this from JwtUtil to JwtAuth
+use App\Utils\JwtAuth; 
 use App\Utils\Email\EmailNotificationService;
 
 class BookingController extends BaseController {
     private $bookingModel;
+    private $userModel; // Use UserModel instead of ProviderModel // Added providerModel
     private $emailService;
     protected $userId;
     protected $userRole;
@@ -24,6 +26,7 @@ class BookingController extends BaseController {
      */
     public function __construct() {
         $this->bookingModel = new BookingModel();
+        $this->userModel = new UserModel(); // Initialize UserModel // Instantiate providerModel
         $this->emailService = new EmailNotificationService();
     }
     
@@ -64,17 +67,28 @@ class BookingController extends BaseController {
             
             // Generate meeting links
             try {
-                $digitalSambaController = new \App\Controllers\DigitalSambaController();
+                // Pass the required models to the constructor
+                $digitalSambaController = new \App\Controllers\DigitalSambaController(
+                    $this->bookingModel, 
+                    $this->userModel
+                ); 
+                error_log("BookingController: Instantiated DigitalSambaController with models");
                 $digitalSambaController->generateMeetingLinks($bookingId);
+                error_log("BookingController: Returned from generateMeetingLinks for booking ID: " . $bookingId);
                 
                 // Refresh booking data to include links
+                error_log("BookingController: Attempting to refresh booking data with ID: " . $bookingId);
                 $booking = $this->bookingModel->getById($bookingId);
+                error_log("BookingController: Successfully refreshed booking data for ID: " . $bookingId);
+
             } catch (\Exception $e) {
-                error_log("Failed to generate meeting links: " . $e->getMessage());
+                error_log("BookingController: EXCEPTION during meeting link generation/refresh: " . $e->getMessage());
+                error_log("BookingController: Stack Trace: " . $e->getTraceAsString());
                 // Continue without links
             }
             
             // Send email notifications
+            error_log("BookingController: Proceeding to send email notifications for booking ID: " . $bookingId);
             try {
                 // Send confirmation to customer
                 $this->emailService->sendBookingConfirmation($bookingId);
@@ -157,17 +171,19 @@ class BookingController extends BaseController {
     /**
      * Get a specific booking by ID
      * Requires authentication
+     * @param string $id Booking ID from route parameter
      */
-    public function view() {
+    public function view(string $id): void
+    {
         // Authenticate user
         if (!$this->authenticate()) {
             Response::json(['error' => 'Authentication required'], 401);
             return;
         }
         
-        // Get booking ID from URL
-        $id = $this->getIdParam();
-        if (!$id) {
+        // ID is now passed directly as an argument, no need for getIdParam()
+        // $id = $this->getIdParam(); 
+        if (empty($id)) {
             Response::json(['error' => 'Booking ID is required'], 400);
             return;
         }
@@ -194,17 +210,19 @@ class BookingController extends BaseController {
     /**
      * Cancel a booking
      * Requires authentication
+     * @param string $id Booking ID from route parameter
      */
-    public function cancel() {
+    public function cancel(string $id): void
+    {
         // Authenticate user
         if (!$this->authenticate()) {
             Response::json(['error' => 'Authentication required'], 401);
             return;
         }
         
-        // Get booking ID from URL
-        $id = $this->getIdParam();
-        if (!$id) {
+        // ID is now passed directly as an argument, no need for getIdParam()
+        // $id = $this->getIdParam(); 
+        if (empty($id)) { 
             Response::json(['error' => 'Booking ID is required'], 400);
             return;
         }
@@ -234,130 +252,69 @@ class BookingController extends BaseController {
         $bookingData = $booking;
         
         // Cancel booking
-        $success = $this->bookingModel->cancelBooking($id);
+        $result = $this->bookingModel->cancel($id, $this->userId);
         
-        if ($success) {
-            // Send cancellation email
-            try {
-                $this->emailService->sendBookingCancellation($id, $bookingData);
-            } catch (\Exception $e) {
-                error_log("Failed to send cancellation email: " . $e->getMessage());
-                // Continue without sending email
-            }
-            
-            Response::json([
-                'success' => true,
-                'message' => 'Booking cancelled successfully'
-            ]);
-        } else {
+        if (!$result) {
             Response::json(['error' => 'Failed to cancel booking'], 500);
-        }
-    }
-    
-    /**
-     * Handle details action for URL pattern: /booking/{id}
-     */
-    public function details() {
-        // If request method is PUT, treat as an update/cancel request
-        if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
-            // Check if this is a cancel request
-            $pathParts = explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
-            $lastPart = end($pathParts);
-            
-            if ($lastPart === 'cancel') {
-                $this->cancel();
-                return;
-            }
-            
-            // Other update methods could go here
-            Response::json(['error' => 'Method not allowed'], 405);
             return;
         }
         
-        // Default to view action
-        $this->view();
+        // Send cancellation email
+        try {
+             $this->emailService->sendBookingCancellation($bookingData); // Pass original data
+        } catch (\Exception $e) {
+            error_log("Failed to send cancellation email: " . $e->getMessage());
+            // Do not fail the request if email fails
+        }
+        
+        Response::json(['message' => 'Booking cancelled successfully']);
     }
     
     /**
-     * Authenticate the current user and set user properties
-     * 
+     * Authenticate user and set $this->userId and $this->userRole
+     *
      * @return bool True if authenticated, false otherwise
      */
     protected function authenticate(): bool {
-        // Use the getUserId method from BaseController
-        $userId = parent::getUserId();
-        
-        if (!$userId) {
-            return false;
-        }
-        
-        // Get the token to extract additional info
-        $token = $this->getBearerToken();
-        
-        if (!$token) {
-            return false;
-        }
-        
-        try {
-            $secret = defined('JWT_SECRET') ? JWT_SECRET : 'default_secret_change_this';
-            $decoded = \Firebase\JWT\JWT::decode($token, new \Firebase\JWT\Key($secret, 'HS256'));
-            
-            // Store user information from token
+        $userId = $this->getUserId(); // Use BaseController method
+        if ($userId) {
             $this->userId = $userId;
-            $this->userRole = $decoded->data->role ?? 'user';
-            
+            // TODO: Fetch user role properly if needed for fine-grained access control
+            // For now, assume role check might happen within methods if required
+            $user = $this->userModel->findById($userId); // Fetch user to potentially get role
+            $this->userRole = $user['role'] ?? 'user'; // Get role, default to 'user'
             return true;
-        } catch (\Exception $e) {
-            error_log("Token validation error: " . $e->getMessage());
-            return false;
         }
+        return false;
     }
     
-    /**
-     * Get ID parameter from URL
-     * 
-     * @return string|null ID or null if not found
-     */
-    private function getIdParam() {
-        $pathParts = explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
+    // Remove getIdParam as it's replaced by route parameters
+    /*
+    private function getIdParam()
+    {
+        // Get ID from PATH_INFO set by the old router
+        $pathInfo = $_SERVER['PATH_INFO'] ?? '';
+        $parts = explode('/', trim($pathInfo, '/'));
         
-        // For URLs like /booking/{id}
-        if (count($pathParts) >= 2) {
-            return $pathParts[1];
+        // Assuming format /booking/{id} or /booking/{id}/cancel
+        if (isset($parts[1])) {
+            return $parts[1];
         }
-        
         return null;
     }
+    */
 
-    /**
-     * Get user ID from authentication token
-     * 
-     * @return string|null User ID if authenticated, null otherwise
-     */
+    // getUserId() is provided by BaseController, no need to redefine
+    /*
     protected function getUserId(): ?string {
-        // Get token from header
-        $token = \App\Utils\JwtAuth::getTokenFromHeader();
-        
-        if (!$token) {
-            return null;
-        }
-        
-        // Validate token
-        $tokenData = \App\Utils\JwtAuth::validateToken($token);
-        
-        if (!$tokenData || empty($tokenData->data->user_id)) {
-            return null;
-        }
-        
-        return $tokenData->data->user_id;
+        // Implementation moved to BaseController
     }
-    
-    /**
-     * Get JSON data from request
-     * 
-     * @return array JSON data
-     */
+    */
+
+    // getJsonData() is provided by BaseController, no need to redefine
+    /*
     protected function getJsonData(): array {
-        return parent::getJsonData();
+        // Implementation moved to BaseController
     }
+    */
 }

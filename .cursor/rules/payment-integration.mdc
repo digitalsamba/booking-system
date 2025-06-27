@@ -1,0 +1,87 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Payment Integration Guidelines for SambaConnect
+
+## Security Considerations
+
+1. Never process payment data directly on our servers
+2. Always use a trusted third-party provider (Stripe recommended)
+3. Follow PCI DSS best practices 
+4. Implement proper encryption for sensitive data
+5. Use HTTPS for all payment-related communications
+6. Store only necessary payment information
+7. Never log complete payment details
+
+## Integration Approach
+
+1. Use Stripe API for payment processing
+2. Store payment configurations securely in MongoDB
+3. Implement webhook handling for payment events
+4. Create proper error handling and logging for payment processes
+5. Ensure proper transaction records are maintained
+6. Implement idempotent payment processing
+7. Use Stripe Elements for secure payment form handling
+
+## Database Structure
+
+1. Create a `payments` collection with proper schema validation
+2. Store reference to payments in booking documents
+3. Include status, amount, currency, and timestamps
+4. Store Stripe payment intent IDs for reference
+5. Implement proper indexing for payment queries
+6. Consider payment history for recurring bookings
+7. Store minimal necessary information for compliance
+
+## Backend Implementation
+
+1. Create a dedicated PaymentService for payment operations
+2. Implement proper validation for payment requests
+3. Handle webhook events for payment status updates
+4. Implement proper error handling and logging
+5. Create appropriate API endpoints for payment operations
+6. Implement idempotency keys for payment operations
+7. Handle currency conversion where necessary
+
+## Frontend Implementation
+
+1. Create a PaymentForm component for payment collection
+2. Use Stripe Elements for secure form handling
+3. Implement proper validation and error handling
+4. Show clear loading states during payment processing
+5. Provide clear error messages for payment failures
+6. Implement receipt generation for successful payments
+7. Store payment methods for returning customers (optional)
+
+## User Experience
+
+1. Provide clear pricing information before checkout
+2. Design intuitive payment flow within booking process
+3. Implement proper validation for payment forms
+4. Show clear error messages for payment issues
+5. Provide payment receipts and confirmations
+6. Send email notifications for payment events
+7. Allow users to view their payment history
+
+## Testing
+
+1. Use Stripe test mode for development
+2. Create comprehensive test suites for payment flows
+3. Test various payment scenarios including failures
+4. Implement proper logging for payment debugging
+5. Document test cases for payment functionality
+6. Use mock payment services for automated testing
+7. Create test credit cards for various scenarios
+
+## Compliance
+
+1. Ensure GDPR compliance for European users
+2. Implement proper tax handling based on jurisdiction
+3. Consider VAT/GST requirements where applicable
+4. Keep transaction records according to legal requirements
+5. Design with international payment support in mind
+6. Provide privacy policy updates for payment processing
+
+7. Implement proper terms of service for payments

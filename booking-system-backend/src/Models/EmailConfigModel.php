@@ -9,6 +9,9 @@ use MongoDB\BSON\ObjectId;
  * Model for storing email configuration settings
  */
 class EmailConfigModel extends BaseModel {
+    public function __construct() {
+        parent::__construct('email_configs');
+    }
     /**
      * Get collection name
      *

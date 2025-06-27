@@ -24,11 +24,39 @@ class EmailConfig {
             return;
         }
         
-        // Find the .env file in project root
+        // Only log if DEBUG is enabled
+        $debug = filter_var(getenv('DEBUG'), FILTER_VALIDATE_BOOLEAN);
+
+        // First try to load directly from environment variables (which bootstrap may have set)
+        // This ensures consistency with other parts of the application
+        $envKeys = [
+            
+            'EMAIL_PROVIDER',
+            'EMAIL_FROM',
+            'EMAIL_FROM_NAME',
+            'SMTP_HOST',
+            'SMTP_PORT',
+            'SMTP_USERNAME',
+            'SMTP_PASSWORD',
+            'SMTP_ENCRYPTION',
+            'SENDGRID_API_KEY',
+            'APP_ENV'
+        ];
+        
+        $loadedFromEnv = false;
+        foreach ($envKeys as $key) {
+            $value = getenv($key);
+            if ($value !== false) {
+                self::$config[$key] = $value;
+                $loadedFromEnv = true;
+            }
+        }
+        
+        // Fallback to reading the .env file
         $envFile = dirname(dirname(dirname(__DIR__))) . '/.env';
         
         if (!file_exists($envFile)) {
-            error_log("EmailConfig: .env file not found at: " . $envFile);
+            if ($debug) error_log("EMAIL DEBUG: .env file not found at: " . $envFile);
             self::$loaded = true;
             return;
         }
@@ -53,7 +81,10 @@ class EmailConfig {
                     $value = substr($value, 1, -1);
                 }
                 
-                self::$config[$name] = $value;
+                // Only overwrite if not already set from environment
+                if (!isset(self::$config[$name])) {
+                    self::$config[$name] = $value;
+                }
             }
         }
         

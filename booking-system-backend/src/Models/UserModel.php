@@ -249,17 +249,25 @@ class UserModel extends BaseModel {
             
             // If no valid fields to update
             if (empty($updateData)) {
-                return false;
+                // error_log("UserModel::updateProfile - No valid fields provided for update. Data received: " . json_encode($data)); // Removed temporary logging
+                return false; // <-- Returns false if $updateData is empty
             }
             
             // Add update timestamp
             $updateData['updated_at'] = new UTCDateTime(time() * 1000);
             
+            // error_log("UserModel::updateProfile - Attempting update for ID: {$id} with data: " . json_encode($updateData)); // Removed Temp Debug
+            
+            // Perform the MongoDB update
             $result = $this->collection->updateOne(
-                ['_id' => new ObjectId($id)],
-                ['$set' => $updateData]
+                ['_id' => new ObjectId($id)], // Find user by ID
+                ['$set' => $updateData]      // Set the filtered fields
             );
             
+            // error_log("UserModel::updateProfile - Update result for ID {$id}: Matched={$result->getMatchedCount()}, Modified={$result->getModifiedCount()}"); // Removed Temp Debug
+            
+            // Check if the update was successful
+            // Returns true if at least one document was matched OR modified
             return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
         } catch (\Exception $e) {
             error_log("Error updating user profile: " . $e->getMessage());

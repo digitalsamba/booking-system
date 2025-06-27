@@ -9,6 +9,7 @@ const BookingsView = () => import('../views/BookingsView.vue')
 const ProfileView = () => import('../views/ProfileView.vue')
 const AvailabilityView = () => import('../views/AvailabilityView.vue')
 const PublicBookingView = () => import('../views/PublicBookingView.vue')
+const BrandingSettingsView = () => import('../views/BrandingSettingsView.vue')
 
 const routes = [
   {
@@ -48,8 +49,20 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/booking/:username',
+    path: '/branding-settings',
+    name: 'branding-settings',
+    component: BrandingSettingsView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/public/:username',
     name: 'public-booking',
+    component: PublicBookingView,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/booking/:username',
+    name: 'booking',
     component: PublicBookingView,
     meta: { requiresAuth: false }
   }

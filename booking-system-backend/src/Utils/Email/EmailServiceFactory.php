@@ -24,25 +24,41 @@ class EmailServiceFactory {
             $provider = EmailConfig::get('EMAIL_PROVIDER') ?: 'smtp';
         }
         
-        // Log what provider we're trying to create
-        error_log("EmailServiceFactory: Creating provider '$provider'");
-        
         // Create the appropriate provider
         switch (strtolower($provider)) {
             case 'smtp':
                 return new SmtpEmailProvider($config);
             
             case 'sendgrid':
-                // If config doesn't have api_key but we have it in ENV, add it
+                // Read API key directly from .env file to avoid truncation
+                error_log("EmailServiceFactory: Reading SendGrid API key directly from .env file");
+                
+                // Only read from .env if not provided in config
+                if (!isset($config['api_key'])) {
+                    $envFile = dirname(dirname(dirname(__DIR__))) . '/.env';
+                    if (file_exists($envFile)) {
+                        $content = file_get_contents($envFile);
+                        $matches = [];
+                        if (preg_match('/SENDGRID_API_KEY\s*=\s*[\'"]*([^\'"\n]+)[\'"]*/i', $content, $matches)) {
+                            $config['api_key'] = trim($matches[1]);
+                            error_log("EmailServiceFactory: Successfully read SendGrid API key from .env file (length: " . strlen($config['api_key']) . ")");
+                        } else {
+                            error_log("EmailServiceFactory: Could not find SENDGRID_API_KEY in .env file");
+                        }
+                    } else {
+                        error_log("EmailServiceFactory: .env file not found at $envFile");
+                    }
+                }
+                
+                // Fall back to EmailConfig if direct reading failed
                 if (!isset($config['api_key']) && EmailConfig::get('SENDGRID_API_KEY')) {
+                    error_log("EmailServiceFactory: Falling back to EmailConfig for SendGrid API key");
                     $config['api_key'] = EmailConfig::get('SENDGRID_API_KEY');
                 }
                 
-                // Log if we found a SendGrid API key
-                if (isset($config['api_key'])) {
-                    error_log("EmailServiceFactory: SendGrid API key found (length: " . strlen($config['api_key']) . ")");
-                } else {
-                    error_log("EmailServiceFactory: SendGrid API key NOT found");
+                // Log if we still don't have an API key
+                if (!isset($config['api_key'])) {
+                    error_log("EmailServiceFactory: ERROR - SendGrid API key NOT found after all attempts");
                 }
                 
                 return new SendgridEmailProvider($config);

@@ -17,13 +17,19 @@ export default defineConfig({
     port: 3002,
     host: '0.0.0.0',
     cors: true,
-    allowedHosts: ['df62-31-94-18-180.ngrok-free.app', '.ngrok-free.app'],
+    allowedHosts: ['dev4.wbcnf.net', '.wbcnf.net'],
     strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
+      },
+      // Proxy specific public API endpoints, not the general /public route
+      '^/public/(availability|booking|user/.+|branding/.+)': {
+        target: 'https://api.dev4.wbcnf.net',
+        changeOrigin: true,
+        secure: true
       }
     },
     fs: {
@@ -32,6 +38,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
+    include: ['vue', 'vuetify', 'pinia', 'vue-router', 'axios'],
     exclude: []
   },
   build: {

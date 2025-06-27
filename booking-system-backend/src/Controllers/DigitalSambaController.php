@@ -8,16 +8,23 @@
 
 namespace App\Controllers;
 
+use App\Models\BookingModel;
+use App\Models\UserModel;
 use App\Utils\Response;
 
-class DigitalSambaController extends BaseController {
+class DigitalSambaController {
     private $apiBaseUrl;
     private $defaultSettings;
-    
+    private BookingModel $bookingModel;
+    private UserModel $userModel;
+
     /**
-     * Constructor - loads Digital Samba API configuration
+     * Constructor - loads Digital Samba API configuration and models
      */
-    public function __construct() {
+    public function __construct(BookingModel $bookingModel, UserModel $userModel) {
+        $this->bookingModel = $bookingModel;
+        $this->userModel = $userModel; // Store UserModel instance
+
         // Load Digital Samba configuration
         $configPath = defined('CONFIG_PATH') ? CONFIG_PATH : dirname(dirname(__DIR__)) . '/config';
         
@@ -75,7 +82,10 @@ class DigitalSambaController extends BaseController {
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_VERBOSE => true
+            CURLOPT_VERBOSE => true,
+            // Bypass SSL verification for development
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0
         ]);
         
         // Add request body for POST/PUT/PATCH
@@ -131,8 +141,7 @@ class DigitalSambaController extends BaseController {
      */
     private function createRoom($providerId, $bookingId, $bookingData = []) {
         // Get provider details to access their Digital Samba credentials
-        $userModel = new \App\Models\UserModel();
-        $provider = $userModel->findById($providerId);
+        $provider = $this->userModel->findById($providerId);
         
         if (!$provider) {
             throw new \Exception("Provider not found");
@@ -273,8 +282,7 @@ class DigitalSambaController extends BaseController {
             }
             
             // Get provider details to access their Digital Samba credentials
-            $userModel = new \App\Models\UserModel();
-            $provider = $userModel->findById($providerId);
+            $provider = $this->providerModel->findById($providerId);
             
             if (!$provider) {
                 return ['error' => 'Provider not found'];
@@ -294,8 +302,7 @@ class DigitalSambaController extends BaseController {
             error_log("Found provider credentials - Developer Key: " . substr($developerKey, 0, 10) . "... Team ID: " . $teamId);
             
             // Create or get existing room for this booking
-            $bookingModel = new \App\Models\BookingModel();
-            $booking = $bookingModel->getById($bookingId);
+            $booking = $this->bookingModel->getById($bookingId);
             
             $dsRoomId = null;
             
@@ -317,7 +324,7 @@ class DigitalSambaController extends BaseController {
                 
                 // If this is a new room and we have a booking ID, update the booking with room ID
                 if ($bookingId && $booking) {
-                    $bookingModel->update($bookingId, ['ds_room_id' => $dsRoomId]);
+                    $this->bookingModel->update($bookingId, ['ds_room_id' => $dsRoomId]);
                 }
             }
             
@@ -358,45 +365,26 @@ class DigitalSambaController extends BaseController {
      * Generate meeting links for a booking
      * Creates a Digital Samba room and generates access tokens for provider and customer
      */
-    public function generateMeetingLinks($bookingId = null) {
+    public function generateMeetingLinks(string $bookingId) {
+        // Keep top-level entry log
+        error_log("DigitalSambaController: ENTER generateMeetingLinks for booking ID: " . $bookingId);
+        
         try {
-            // Use provided booking ID or extract from request
-            if (!$bookingId) {
-                // Get booking ID correctly from path info or URL
-                $pathParts = explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
-                // The booking ID should be the part after 'booking' and before 'meeting-links'
-                foreach ($pathParts as $index => $part) {
-                    if ($part === 'booking' && isset($pathParts[$index + 1])) {
-                        $bookingId = $pathParts[$index + 1];
-                        break;
-                    }
-                }
-                
-                if (!$bookingId) {
-                    error_log("Could not extract booking ID from path: " . ($_SERVER['PATH_INFO'] ?? 'N/A'));
-                    Response::json(['error' => 'Booking ID is required'], 400);
-                    return;
-                }
-            }
-            
-            error_log("Generating meeting links for booking ID: " . $bookingId);
-            
             // Get booking
-            $bookingModel = new \App\Models\BookingModel();
-            $booking = $bookingModel->getById($bookingId);
+            $booking = $this->bookingModel->getById($bookingId);
             
             if (!$booking) {
-                Response::json(['error' => 'Booking not found'], 404);
-                return;
+                error_log("DS_ERROR: Booking not found: " . $bookingId);
+                return ['error' => 'Booking not found', 'status' => 404];
             }
             
-            // Get provider details
-            $userModel = new \App\Models\UserModel();
-            $provider = $userModel->findById((string)$booking['provider_id']);
+            // Get provider details from users collection
+            $providerId = (string)$booking['provider_id'];
+            $provider = $this->userModel->findById($providerId);
             
             if (!$provider) {
-                Response::json(['error' => 'Provider not found'], 404);
-                return;
+                error_log("DS_ERROR: Provider not found: " . $providerId);
+                return ['error' => 'Provider not found', 'status' => 404];
             }
             
             $providerDisplayName = $provider['display_name'] ?? $provider['username'];
@@ -414,15 +402,18 @@ class DigitalSambaController extends BaseController {
             $dsRoomId = null;
             
             if ($developerKey && $teamId) {
+                // Keep info log
+                error_log("DS_INFO: Provider has credentials. Proceeding with DS API calls.");
                 try {
                     // Create or find Digital Samba room
                     $dsRoomId = $booking['ds_room_id'] ?? null;
                     $room = null;
                     
                     if (!$dsRoomId) {
-                        // Create a new Digital Samba room
+                        // Keep info log
+                        error_log("DS_INFO: No existing room ID found. Creating new room...");
                         $room = $this->createRoom(
-                            (string)$booking['provider_id'], 
+                            $providerId, 
                             $bookingId,
                             [
                                 'title' => "Meeting with {$providerDisplayName} - {$customerName}",
@@ -430,8 +421,12 @@ class DigitalSambaController extends BaseController {
                                 'end_time' => $booking['end_time'] ?? null
                             ]
                         );
-                        
                         $dsRoomId = $room['id'] ?? null;
+                        // Keep info log
+                        error_log("DS_INFO: createRoom returned. New room ID: " . ($dsRoomId ?? 'null'));
+                    } else {
+                        // Keep info log
+                        error_log("DS_INFO: Using existing room ID: " . $dsRoomId);
                     }
                     
                     if ($dsRoomId) {
@@ -440,7 +435,7 @@ class DigitalSambaController extends BaseController {
                             $dsRoomId,
                             $developerKey,
                             $providerDisplayName,
-                            'moderator', // Use Digital Samba's supported roles
+                            'moderator',
                             'provider-' . $provider['_id'],
                             $teamId
                         );
@@ -450,111 +445,119 @@ class DigitalSambaController extends BaseController {
                             $dsRoomId,
                             $developerKey,
                             $customerName,
-                            'attendee', // Use Digital Samba's supported roles (changed from participant)
+                            'attendee',
                             'customer-' . $bookingId,
                             $teamId
                         );
                         
-                        // Extract meeting URLs from tokens - Digital Samba API may return 'link' instead of 'url'
+                        // Extract meeting URLs from tokens
                         $providerLink = $providerToken['link'] ?? $providerToken['url'] ?? null;
                         $customerLink = $customerToken['link'] ?? $customerToken['url'] ?? null;
+                        // Keep info log
+                        error_log("DS_INFO: Extracted links. Provider: " . ($providerLink ? 'OK' : 'FAIL') . ", Customer: " . ($customerLink ? 'OK' : 'FAIL'));
+                    } else {
+                         // Keep error log
+                         error_log("DS_ERROR: Failed to create or find DS Room ID.");
                     }
                 } catch (\Exception $e) {
-                    error_log("Error creating Digital Samba meeting: " . $e->getMessage());
-                    // Fall back to simple links
+                    // Keep error log
+                    error_log("DS_ERROR: Exception during DS API interaction: " . $e->getMessage());
+                    // Fall back, links will remain null
                 }
+            } else {
+                // Keep info log
+                error_log("DS_INFO: Provider does not have credentials. Skipping DS API calls.");
             }
             
-            // If API request failed or provider doesn't have credentials, inform the user
+            // If API request failed or provider doesn't have credentials, return error
             if (!$providerLink || !$customerLink) {
-                Response::json([
-                    'error' => 'Failed to generate Digital Samba meeting links. Provider may not have proper Digital Samba credentials.',
-                    'details' => 'The provider needs both a valid developer_key and team_id in their profile to create meetings.'
-                ], 400);
-                return;
+                // Keep error log
+                error_log("DS_ERROR: Link generation failed or skipped. Returning error array.");
+                return [
+                    'error' => 'Failed to generate Digital Samba meeting links. Provider may not have proper Digital Samba credentials or an API error occurred.',
+                    'details' => 'The provider needs both a valid developer_key and team_id in their profile to create meetings.',
+                    'status' => 400 // Or 500 if it was an API error potentially
+                ];
             }
             
             // Update booking with links and room ID
             $updateData = [
                 'provider_link' => $providerLink,
+                //'customer_link' => $customerLink, // Customer link is now nested
                 'ds_room_id' => $dsRoomId
             ];
             
-            // Update customer data
-            if (isset($booking['customer']) && is_array($booking['customer'])) {
-                // Customer is an object in the booking - preserve all existing fields
-                $customer = $booking['customer'];
-                $customer['customer_link'] = $customerLink;
-                
-                // Ensure name is preserved
-                if (empty($customer['name']) && !empty($customerName) && $customerName !== 'Customer') {
-                    $customer['name'] = $customerName;
+            // Update customer data - IMPORTANT: ensure 'customer' field exists and is an array
+            if (!isset($booking['customer']) || !is_array($booking['customer'])) {
+                 // Keep warning log
+                 error_log("DS_WARNING: Booking customer field is missing or not an array. Initializing.");
+                 $booking['customer'] = []; // Initialize if missing
+            }
+            // Preserve existing customer fields and add the link
+            $customerDataForUpdate = $booking['customer'];
+            $customerDataForUpdate['customer_link'] = $customerLink;
+            $customerDataForUpdate['name'] = $customerName; // Ensure name is updated
+            
+            $updateData['customer'] = $customerDataForUpdate;
+            
+            try {
+                $updated = $this->bookingModel->update($bookingId, $updateData);
+                if ($updated) {
+                    // Keep info log
+                    error_log("DS_INFO: Successfully updated booking ID {$bookingId} with links.");
+                } else {
+                    // Keep warning log
+                    error_log("DS_WARNING: bookingModel->update returned false for ID {$bookingId}. Data might have been the same.");
+                    // Consider re-fetching the booking to double-check if links are present
+                    $checkBooking = $this->bookingModel->getById($bookingId);
+                    if(isset($checkBooking['provider_link']) && isset($checkBooking['customer']['customer_link'])){
+                         // Keep info log
+                         error_log("DS_INFO: Re-fetch confirmed links are present in booking.");
+                         $updated = true; // Treat as success if links are there
+                    }
+                    else {
+                         // Keep error log
+                         error_log("DS_ERROR: bookingModel->update returned false AND re-fetch shows links are missing.");
+                    }
                 }
-                
-                $updateData['customer'] = $customer;
-            } else {
-                // Customer data is missing or not an array - create a minimal record
-                $updateData['customer'] = [
-                    'id' => $booking['customer_id'] ?? $bookingId,
-                    'name' => $customerName,
+            } catch (\Throwable $t) {
+                // Keep error log
+                error_log("DS_ERROR: FATAL ERROR during booking update for ID {$bookingId}: " . $t->getMessage());
+                error_log("DS_ERROR: Stack Trace: " . $t->getTraceAsString());
+                return ['error' => 'Failed to update booking with links after generation.', 'status' => 500]; 
+            }
+            
+            // Keep final success log
+            error_log("DigitalSambaController: Exiting generateMeetingLinks successfully for booking ID: " . $bookingId);
+            
+            // Return success with links
+            // Get updated booking data to include in the response
+            $finalBooking = $this->bookingModel->getById($bookingId);
+            return [
+                'success' => true,
+                'message' => 'Meeting links generated successfully',
+                'links' => [
+                    'provider_link' => $providerLink,
                     'customer_link' => $customerLink
-                ];
-            }
+                ],
+                'booking' => $finalBooking // Return the latest booking data
+            ];
             
-            // Update the booking
-            $success = $bookingModel->update($bookingId, $updateData);
-            
-            if ($success) {
-                // Get updated booking
-                $updatedBooking = $bookingModel->getById($bookingId);
-                
-                Response::json([
-                    'success' => true,
-                    'message' => 'Meeting links generated successfully',
-                    'links' => [
-                        'provider_link' => $providerLink,
-                        'customer_link' => $customerLink
-                    ],
-                    'booking' => $updatedBooking
-                ]);
-            } else {
-                Response::json(['error' => 'Failed to update booking with meeting links'], 500);
-            }
-        } catch (\Exception $e) {
-            error_log("Error in DigitalSambaController::generateMeetingLinks: " . $e->getMessage());
-            Response::json(['error' => 'Failed to generate meeting links: ' . $e->getMessage()], 500);
+        } catch (\Throwable $e) { // Catch Throwable at the top level
+            // Keep error log
+            error_log("DS_ERROR: Uncaught Throwable in generateMeetingLinks: " . $e->getMessage());
+            error_log("DS_ERROR: Trace: " . $e->getTraceAsString());
+            return ['error' => 'Failed to generate meeting links: ' . $e->getMessage(), 'status' => 500];
         }
     }
     
     /**
      * Get meeting links for a booking
      */
-    public function getMeetingLinks($bookingId = null) {
+    public function getMeetingLinks(string $bookingId) {
         try {
-            // Use provided booking ID or extract from request
-            if (!$bookingId) {
-                // Get booking ID correctly from path info or URL
-                $pathParts = explode('/', trim($_SERVER['PATH_INFO'] ?? '', '/'));
-                // The booking ID should be the part after 'booking' and before 'meeting-links'
-                foreach ($pathParts as $index => $part) {
-                    if ($part === 'booking' && isset($pathParts[$index + 1])) {
-                        $bookingId = $pathParts[$index + 1];
-                        break;
-                    }
-                }
-                
-                if (!$bookingId) {
-                    error_log("Could not extract booking ID from path: " . ($_SERVER['PATH_INFO'] ?? 'N/A'));
-                    Response::json(['error' => 'Booking ID is required'], 400);
-                    return;
-                }
-            }
-            
-            error_log("Getting meeting links for booking ID: " . $bookingId);
-            
             // Get booking
-            $bookingModel = new \App\Models\BookingModel();
-            $booking = $bookingModel->getById($bookingId);
+            $booking = $this->bookingModel->getById($bookingId);
             
             if (!$booking) {
                 Response::json(['error' => 'Booking not found'], 404);

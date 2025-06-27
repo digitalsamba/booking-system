@@ -1,13 +1,20 @@
 <?php
 /**
- * Simple router for PHP's built-in server
+ * Main application router using FastRoute
  */
 
-// Load environment configuration
+// Ensure autoloader is loaded first
+require_once __DIR__ . '/vendor/autoload.php';
+
+// --- Basic Setup ---
 require_once __DIR__ . '/bootstrap.php';
 
-// Set up error handling
-if (DEBUG) {
+use FastRoute\Dispatcher;
+use function FastRoute\simpleDispatcher;
+use App\Utils\Response; // Assuming this utility handles JSON output and status codes
+
+// Set up error handling (optional here, might be better in bootstrap)
+if (defined('DEBUG') && DEBUG) {
     ini_set('display_errors', 1);
     ini_set('display_startup_errors', 1);
     error_reporting(E_ALL);
@@ -16,266 +23,131 @@ if (DEBUG) {
     error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED & ~E_STRICT & ~E_WARNING);
 }
 
-// Parse the URL
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$uri = urldecode($uri);
+// --- CORS Preflight Handling ---
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    // Set CORS headers using environment configuration
+    header('Access-Control-Allow-Origin: ' . ALLOW_ORIGIN); 
+    header('Access-Control-Allow-Methods: ' . ALLOW_METHODS);
+    header('Access-Control-Allow-Headers: ' . ALLOW_HEADERS);
+    header('Access-Control-Max-Age: 86400'); // Cache preflight for 24 hours
+    http_response_code(204); // No Content for OPTIONS response
+    exit;
+}
 
-// Routes
-$routes = [
-    '/api/bookings' => 'BookingController',
-    '/api/services' => 'ServiceController',
-    '/api/availability' => 'AvailabilityController',
-    '/api/auth' => 'AuthController',
-    '/api/users' => 'UserController',
-    // Add more routes as needed
-];
+// Set default CORS header for actual requests
+header('Access-Control-Allow-Origin: ' . ALLOW_ORIGIN);
 
-// Default response for undefined routes
-$response = [
-    'status' => 404,
-    'message' => 'Not found'
-];
+// --- FastRoute Dispatching ---
 
-// API prefix for all endpoints
-$apiPrefix = '/api';
+// 1. Create dispatcher
+$routeDefinitionCallback = require CONFIG_PATH . '/routes.php';
+// ADDED FOR DEBUGGING: Check if the callback was loaded
+if (is_callable($routeDefinitionCallback)) {
+    error_log("--> Route definition callback loaded successfully.");
+} else {
+    error_log("--> ERROR: Failed to load route definition callback from config/routes.php. Check file syntax and path.");
+    // Optionally, exit here if routes are critical
+    Response::json(['error' => 'Internal Server Error - Route Configuration Failed'], 500);
+    exit;
+}
+$dispatcher = simpleDispatcher($routeDefinitionCallback);
 
-// Check if the URI starts with the API prefix
-if (strpos($uri, $apiPrefix) === 0) {
-    // Find matching route
-    foreach ($routes as $route => $controller) {
-        if (strpos($uri, $route) === 0) {
-            // Load controller
-            $controllerFile = __DIR__ . '/src/Controllers/' . $controller . '.php';
-            if (file_exists($controllerFile)) {
-                require_once $controllerFile;
-                
-                // Extract class name from namespace
-                $controllerClass = '\\App\\Controllers\\' . $controller;
-                
-                // Create controller instance
-                $controllerInstance = new $controllerClass();
-                
-                // Handle the request
-                $response = $controllerInstance->handleRequest($uri);
-                break;
+// 2. Get HTTP method and URI
+$httpMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+// Get URI path, remove query string, decode
+$uri = $_SERVER['REQUEST_URI'] ?? '/';
+if (false !== $pos = strpos($uri, '?')) {
+    $uri = substr($uri, 0, $pos);
+}
+$uri = rawurldecode($uri);
+
+// IMPORTANT: Handle potential /api prefix removal.
+// The routes in routes.php are defined *without* the /api prefix because
+// we assume the frontend proxy (Vite) or webserver (Nginx/Apache) 
+// strips it before passing the request to this PHP script.
+// If this script *is* receiving URIs like /api/bookings, we need to strip it here:
+// Example: if (strpos($uri, 'api/') === 0) { $uri = substr($uri, 4); }
+// For now, we assume the prefix is already removed and routes match directly (e.g., 'bookings', 'auth/login')
+error_log("FastRoute Dispatching: Method={$httpMethod}, URI='{$uri}'");
+
+// 3. Dispatch the route
+error_log("--> Attempting to dispatch URI: [" . $uri . "]"); // ADDED FOR DEBUGGING
+error_log("--> HTTP Method: [" . $httpMethod . "]"); // ADDED FOR DEBUGGING
+$routeInfo = $dispatcher->dispatch($httpMethod, $uri);
+
+// 4. Handle dispatch result
+switch ($routeInfo[0]) {
+    case Dispatcher::NOT_FOUND:
+        error_log("FastRoute Result: 404 Not Found for URI '{$uri}'");
+        Response::json(['error' => 'Not Found'], 404);
+        break;
+
+    case Dispatcher::METHOD_NOT_ALLOWED:
+        $allowedMethods = $routeInfo[1];
+        error_log("FastRoute Result: 405 Method Not Allowed for URI '{$uri}'. Allowed: " . implode(', ', $allowedMethods));
+        header('Allow: ' . implode(', ', $allowedMethods)); // Set Allow header
+        Response::json(['error' => 'Method Not Allowed'], 405);
+        break;
+
+    case Dispatcher::FOUND:
+        $handler = $routeInfo[1]; // [Controller::class, 'methodName'] or Closure
+        $vars = $routeInfo[2];    // Route parameters (e.g., ['id' => '123'])
+        
+        error_log("FastRoute Result: Found route for URI '{$uri}'. Handler: " . json_encode($handler) . ", Vars: " . json_encode($vars));
+        
+        try {
+            // Check if handler is a Closure (for simple routes like /ping)
+            if ($handler instanceof Closure) {
+                $handler($vars); // Call the closure
+            } 
+            // Check if handler is [Controller, Method]
+            elseif (is_array($handler) && count($handler) === 2 && is_string($handler[0]) && is_string($handler[1])) {
+                $controllerClass = $handler[0];
+                $method = $handler[1];
+
+                if (class_exists($controllerClass)) {
+                    // Instantiate controller (assumes no constructor args needed based on current pattern)
+                    // If DI is needed later, this is where it would happen.
+                    $controller = new $controllerClass();
+
+                    if (method_exists($controller, $method)) {
+                        // Call the controller method, passing route parameters as arguments
+                        // Uses reflection to match parameters if needed, but simple sequential passing works too
+                        // For simplicity, passing $vars array - method needs to handle it or use func_get_args()
+                        // A better approach uses reflection or passes named args.
+                        // Let's pass named args directly if possible (PHP 8+)
+                        // $controller->$method(...array_values($vars)); // Simple sequential passing
+                        $controller->$method(...$vars); // Pass named parameters (requires PHP 8 named args)
+                    } else {
+                        error_log("FastRoute Error: Method '{$method}' not found in controller '{$controllerClass}'");
+                        Response::json(['error' => 'Internal Server Error - Method Not Found'], 500);
+                    }
+                } else {
+                    error_log("FastRoute Error: Controller class '{$controllerClass}' not found");
+                    Response::json(['error' => 'Internal Server Error - Controller Not Found'], 500);
+                }
+            } else {
+                error_log("FastRoute Error: Invalid handler format for route '{$uri}'. Handler: " . json_encode($handler));
+                Response::json(['error' => 'Internal Server Error - Invalid Route Configuration'], 500);
+            }
+        } catch (\Throwable $e) { // Catch Throwable for PHP 7+ errors
+            error_log("FastRoute Execution Error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+            error_log("Stack Trace: \n" . $e->getTraceAsString());
+            // Use a generic error in production
+            $errorMsg = (defined('DEBUG') && DEBUG) ? $e->getMessage() : 'Internal Server Error';
+            
+            // Try to use Response::json if available
+            if (class_exists('App\Utils\Response')) {
+                Response::json(['error' => $errorMsg], 500);
+            } else {
+                // Fallback response
+                header('Content-Type: application/json');
+                http_response_code(500);
+                echo json_encode(['error' => $errorMsg]);
+                exit;
             }
         }
-    }
+        break;
 }
 
-// Set content type to JSON
-header('Content-Type: application/json');
-
-// Set status code
-http_response_code($response['status'] ?? 200);
-
-// Output response
-echo json_encode($response);
-
-// Handle OPTIONS preflight request
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    // Set CORS headers
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-    header('Access-Control-Max-Age: 86400');  // 24 hours
-    
-    // Return 200 OK with no content
-    http_response_code(200);
-    exit;
-}
-
-// Log incoming request for debugging
-error_log("Incoming request: " . $_SERVER['REQUEST_METHOD'] . " " . $_SERVER['REQUEST_URI']);
-
-// Check if the request is for a static file (HTML, CSS, JS, images)
-$staticExtensions = ['html', 'css', 'js', 'png', 'jpg', 'jpeg', 'gif', 'ico', 'svg'];
-$requestPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$extension = pathinfo($requestPath, PATHINFO_EXTENSION);
-
-if (in_array($extension, $staticExtensions)) {
-    // For static files in /public directory
-    $filePath = __DIR__ . '/public' . $requestPath;
-    
-    // If file doesn't exist in /public, try the root directory
-    if (!file_exists($filePath)) {
-        $filePath = __DIR__ . $requestPath;
-    }
-    
-    // If the file exists, serve it with appropriate content type
-    if (file_exists($filePath)) {
-        $contentType = 'text/plain';
-        
-        // Set content type based on file extension
-        switch ($extension) {
-            case 'html': $contentType = 'text/html'; break;
-            case 'css': $contentType = 'text/css'; break;
-            case 'js': $contentType = 'application/javascript'; break;
-            case 'png': $contentType = 'image/png'; break;
-            case 'jpg': case 'jpeg': $contentType = 'image/jpeg'; break;
-            case 'gif': $contentType = 'image/gif'; break;
-            case 'ico': $contentType = 'image/x-icon'; break;
-            case 'svg': $contentType = 'image/svg+xml'; break;
-        }
-        
-        header('Content-Type: ' . $contentType);
-        readfile($filePath);
-        exit;
-    }
-}
-
-// Direct routes for system checks
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$uri = trim($uri, '/');
-
-// Simple routes for testing API availability
-if ($uri === 'ping' || $uri === 'test') {
-    header('Content-Type: application/json');
-    echo json_encode([
-        'status' => 'ok',
-        'message' => 'API is running',
-        'timestamp' => time(),
-        'route' => $uri
-    ]);
-    exit;
-}
-
-// Public API endpoints
-if (preg_match('#^public/availability$#', $uri)) {
-    $controller = new \App\Controllers\PublicController();
-    $controller->availability();
-    exit;
-}
-
-if (preg_match('#^public/booking$#', $uri)) {
-    $controller = new \App\Controllers\PublicController();
-    $controller->booking();
-    exit;
-}
-
-// Provider details endpoint
-if (preg_match('#^public/provider/([^/]+)$#', $uri, $matches)) {
-    $controller = new \App\Controllers\PublicController();
-    $controller->getProviderDetails($matches[1]);
-    exit;
-}
-
-// Booking routes - public endpoints
-if (preg_match('#^booking/create$#', $uri)) {
-    $controller = new \App\Controllers\BookingController();
-    $controller->create();
-    exit;
-}
-
-// Booking routes - authenticated endpoints
-if (preg_match('#^bookings$#', $uri)) {
-    $controller = new \App\Controllers\BookingController();
-    $controller->index();
-    exit;
-}
-
-if (preg_match('#^booking/([^/]+)$#', $uri, $matches)) {
-    $controller = new \App\Controllers\BookingController();
-    $_SERVER['PATH_INFO'] = '/booking/' . $matches[1];
-    $controller->details();
-    exit;
-}
-
-if (preg_match('#^booking/([^/]+)/cancel$#', $uri, $matches)) {
-    $controller = new \App\Controllers\BookingController();
-    $_SERVER['PATH_INFO'] = '/booking/' . $matches[1] . '/cancel';
-    $controller->cancel();
-    exit;
-}
-
-// Auth routes
-if (preg_match('#^auth/login$#', $uri)) {
-    $controller = new \App\Controllers\AuthController();
-    $controller->login();
-    exit;
-}
-
-if (preg_match('#^auth/register$#', $uri)) {
-    $controller = new \App\Controllers\AuthController();
-    $controller->register();
-    exit;
-}
-
-// Add this new route for token generation
-if (preg_match('#^auth/new-token$#', $uri)) {
-    $controller = new \App\Controllers\AuthController();
-    $controller->newToken();
-    exit;
-}
-
-// Profile management
-if (preg_match('#^auth/profile$#', $uri)) {
-    $controller = new \App\Controllers\AuthController();
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        $controller->getProfile();
-    } else if ($_SERVER['REQUEST_METHOD'] === 'PUT' || $_SERVER['REQUEST_METHOD'] === 'POST') {
-        $controller->updateProfile();
-    }
-    exit;
-}
-
-// Add these routes right before the "For all other routes..." section
-
-// Digital Samba meeting links routes
-if (preg_match('#^booking/([^/]+)/meeting-links$#', $uri, $matches)) {
-    $bookingId = $matches[1];
-    
-    try {
-        $controller = new \App\Controllers\DigitalSambaController();
-        
-        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-            $_SERVER['PATH_INFO'] = "/booking/{$bookingId}/meeting-links";
-            $controller->getMeetingLinks($bookingId);
-        } else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $_SERVER['PATH_INFO'] = "/booking/{$bookingId}/meeting-links";
-            $controller->generateMeetingLinks($bookingId);
-        }
-    } catch (\Exception $e) {
-        error_log("Error handling meeting links request: " . $e->getMessage());
-        header('Content-Type: application/json');
-        echo json_encode([
-            'error' => 'Failed to process request: ' . $e->getMessage()
-        ]);
-    }
-    exit;
-}
-
-// Email configuration routes
-if (preg_match('#^email/config$#', $uri)) {
-    $controller = new \App\Controllers\EmailController();
-    
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        $controller->getEmailConfig();
-    } else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $controller->saveEmailConfig();
-    } else if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-        $controller->resetEmailConfig();
-    }
-    exit;
-}
-
-if (preg_match('#^email/providers$#', $uri)) {
-    $controller = new \App\Controllers\EmailController();
-    $controller->getSupportedProviders();
-    exit;
-}
-
-if (preg_match('#^email/test$#', $uri)) {
-    $controller = new \App\Controllers\EmailController();
-    $controller->sendTestEmail();
-    exit;
-}
-
-// Debug endpoint for authentication troubleshooting
-if ($uri === 'auth-debug') {
-    include_once __DIR__ . '/public/auth_debug.php';
-    exit;
-}
-
-// For all other routes, include the main application entry point
-include_once __DIR__ . '/public/index.php';
+// No need for exit() here as controllers/Response::json handle it

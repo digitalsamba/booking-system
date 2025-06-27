@@ -75,7 +75,8 @@ class EmailNotificationService {
             
             // Get email service for provider
             $emailService = $this->getEmailServiceForProvider($provider['id']);
-            
+            error_log("EmailNotificationService: Got email service for provider: " . $emailService->getProviderName());
+
             // Format dates
             $bookingDate = date('l, F j, Y', strtotime($booking['start_time']));
             $startTime = date('g:i A', strtotime($booking['start_time']));
@@ -94,18 +95,25 @@ class EmailNotificationService {
                 'company_name' => getenv('EMAIL_FROM_NAME') ?: 'Booking System'
             ];
             
+            // Log before sending
+            error_log("EmailNotificationService: Attempting to send 'booking_confirmation' to {$customerEmail} with subject 'Booking Confirmation: {$bookingDate} at {$startTime}'");
+            error_log("EmailNotificationService: Template vars: " . json_encode($templateVars));
+
             // Send email
-            $subject = "Booking Confirmation: {$bookingDate} at {$startTime}";
-            return $emailService->sendTemplate(
+            $result = $emailService->sendTemplate(
                 $customerEmail,
-                $subject,
+                "Booking Confirmation: {$bookingDate} at {$startTime}",
                 'booking_confirmation',
                 $templateVars
             );
+
+            error_log("EmailNotificationService: sendTemplate result for customer: " . ($result ? 'true' : 'false'));
+            return $result;
             
         } catch (\Exception $e) {
-            error_log("Error sending booking confirmation email: " . $e->getMessage());
-            return false;
+            error_log("EmailNotificationService: EXCEPTION in sendBookingConfirmation: " . $e->getMessage());
+            error_log("EmailNotificationService: Stack Trace: " . $e->getTraceAsString());
+            throw $e;
         }
     }
     
@@ -143,7 +151,8 @@ class EmailNotificationService {
             
             // Get email service for system
             $emailService = $this->getEmailServiceForSystem();
-            
+            error_log("EmailNotificationService: Got email service for system: " . $emailService->getProviderName());
+
             // Format dates
             $bookingDate = date('l, F j, Y', strtotime($booking['start_time']));
             $startTime = date('g:i A', strtotime($booking['start_time']));
@@ -164,18 +173,25 @@ class EmailNotificationService {
                 'company_name' => getenv('EMAIL_FROM_NAME') ?: 'Booking System'
             ];
             
+            // Log before sending
+            error_log("EmailNotificationService: Attempting to send 'booking_notification' to {$providerEmail} with subject 'New Booking: {$templateVars['customer_name']} on {$bookingDate}'");
+            error_log("EmailNotificationService: Template vars: " . json_encode($templateVars));
+
             // Send email
-            $subject = "New Booking: {$templateVars['customer_name']} on {$bookingDate}";
-            return $emailService->sendTemplate(
+            $result = $emailService->sendTemplate(
                 $providerEmail,
-                $subject,
+                "New Booking: {$templateVars['customer_name']} on {$bookingDate}",
                 'booking_notification',
                 $templateVars
             );
+
+            error_log("EmailNotificationService: sendTemplate result for provider: " . ($result ? 'true' : 'false'));
+            return $result;
             
         } catch (\Exception $e) {
-            error_log("Error sending booking notification email: " . $e->getMessage());
-            return false;
+            error_log("EmailNotificationService: EXCEPTION in sendBookingNotification: " . $e->getMessage());
+            error_log("EmailNotificationService: Stack Trace: " . $e->getTraceAsString());
+            throw $e;
         }
     }
     
@@ -213,7 +229,8 @@ class EmailNotificationService {
             
             // Get email service for provider
             $emailService = $this->getEmailServiceForProvider($provider['id']);
-            
+            error_log("EmailNotificationService: Got email service for provider: " . $emailService->getProviderName());
+
             // Format dates
             $bookingDate = date('l, F j, Y', strtotime($booking['start_time']));
             $startTime = date('g:i A', strtotime($booking['start_time']));
@@ -232,18 +249,25 @@ class EmailNotificationService {
                 'company_name' => getenv('EMAIL_FROM_NAME') ?: 'Booking System'
             ];
             
+            // Log before sending
+            error_log("EmailNotificationService: Attempting to send 'booking_reminder' to {$customerEmail} with subject 'Reminder: Your booking on {$bookingDate} at {$startTime}'");
+            error_log("EmailNotificationService: Template vars: " . json_encode($templateVars));
+
             // Send email
-            $subject = "Reminder: Your booking on {$bookingDate} at {$startTime}";
-            return $emailService->sendTemplate(
+            $result = $emailService->sendTemplate(
                 $customerEmail,
-                $subject,
+                "Reminder: Your booking on {$bookingDate} at {$startTime}",
                 'booking_reminder',
                 $templateVars
             );
+
+            error_log("EmailNotificationService: sendTemplate result for customer: " . ($result ? 'true' : 'false'));
+            return $result;
             
         } catch (\Exception $e) {
-            error_log("Error sending booking reminder email: " . $e->getMessage());
-            return false;
+            error_log("EmailNotificationService: EXCEPTION in sendBookingReminder: " . $e->getMessage());
+            error_log("EmailNotificationService: Stack Trace: " . $e->getTraceAsString());
+            throw $e;
         }
     }
     
@@ -254,7 +278,7 @@ class EmailNotificationService {
      * @param array $bookingData Booking data if the booking is already deleted
      * @return bool Success status
      */
-    public function sendBookingCancellation(string $bookingId, array $bookingData = null): bool {
+    public function sendBookingCancellation(string $bookingId, ?array $bookingData = null): bool {
         try {
             // Get booking details
             $booking = $bookingData;
@@ -286,7 +310,8 @@ class EmailNotificationService {
             
             // Get email service for provider
             $emailService = $this->getEmailServiceForProvider($provider['id']);
-            
+            error_log("EmailNotificationService: Got email service for provider: " . $emailService->getProviderName());
+
             // Format dates
             $bookingDate = date('l, F j, Y', strtotime($booking['start_time']));
             $startTime = date('g:i A', strtotime($booking['start_time']));
@@ -301,18 +326,25 @@ class EmailNotificationService {
                 'company_name' => getenv('EMAIL_FROM_NAME') ?: 'Booking System'
             ];
             
+            // Log before sending
+            error_log("EmailNotificationService: Attempting to send 'booking_cancellation' to {$customerEmail} with subject 'Booking Cancellation: {$bookingDate} at {$startTime}'");
+            error_log("EmailNotificationService: Template vars: " . json_encode($templateVars));
+
             // Send email
-            $subject = "Booking Cancellation: {$bookingDate} at {$startTime}";
-            return $emailService->sendTemplate(
+            $result = $emailService->sendTemplate(
                 $customerEmail,
-                $subject,
+                "Booking Cancellation: {$bookingDate} at {$startTime}",
                 'booking_cancellation',
                 $templateVars
             );
+
+            error_log("EmailNotificationService: sendTemplate result for customer: " . ($result ? 'true' : 'false'));
+            return $result;
             
         } catch (\Exception $e) {
-            error_log("Error sending booking cancellation email: " . $e->getMessage());
-            return false;
+            error_log("EmailNotificationService: EXCEPTION in sendBookingCancellation: " . $e->getMessage());
+            error_log("EmailNotificationService: Stack Trace: " . $e->getTraceAsString());
+            throw $e;
         }
     }
     

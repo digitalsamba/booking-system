@@ -1,0 +1,90 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Windows Environment Guidelines for SambaConnect
+
+## Environment Setup
+
+Development environment:
+- Windows OS
+- PHP 8.x with Composer on Windows
+- Node.js on Windows
+- PowerShell as primary shell
+- Visual Studio Code with Cursor
+- MongoDB running in Docker container
+- Docker Desktop for Windows
+- Vite development server for frontend
+- Vue Devtools for browser debugging
+
+## Path Handling
+
+1. Use Windows path separators (backslashes) in all Windows-specific code
+2. Format commands for PowerShell (not Bash)
+3. Use PowerShell conventions for environment variables ($env:VARIABLE_NAME)
+4. Remember Windows file path case insensitivity
+5. Consider Windows-specific dependencies and compatibility
+6. For file operations, use PowerShell cmdlets (Get-Content, Set-Content, etc.)
+7. Use path.join() or path.resolve() for cross-platform path handling in JavaScript
+
+## PowerShell Commands
+
+PowerShell execution examples:
+- Running scripts: .\script.ps1
+- Setting environment variables: $env:NODE_ENV = "development"
+- Path joining: Join-Path $PSScriptRoot "config"
+- File reading: Get-Content .\path\to\file.txt
+- File writing: Set-Content -Path .\path\to\file.txt -Value "content"
+- Directory creation: New-Item -Path .\path\to\directory -ItemType Directory
+
+## Windows-Specific Considerations
+
+1. File locking issues on Windows
+2. Case insensitivity of Windows filesystem
+3. Path length limitations (MAX_PATH)
+4. Reserved filenames in Windows
+5. NTFS permissions and attributes
+6. Line ending differences (CRLF vs LF)
+7. Performance considerations for Windows filesystem
+
+## Docker on Windows
+
+1. Use Docker Desktop for Windows
+2. Consider volume mount performance on Windows
+3. Use proper path formatting in docker-compose.yml
+4. Handle line ending issues in Docker context
+5. Consider WSL2 backend for Docker Desktop
+6. Use Docker networks for service communication
+7. Handle permissions issues in mounted volumes
+
+## PHP on Windows
+
+1. Install PHP extensions manually if needed
+2. Configure php.ini for Windows environment
+3. Handle path issues in include/require statements
+4. Configure proper error logging paths
+5. Use appropriate PHP CLI commands for Windows
+6. Handle MongoDB connection in Windows environment
+7. Configure opcache for development environment
+
+## Node.js on Windows
+
+1. Use npm or yarn for package management
+2. Configure path-related settings in package.json
+3. Handle line ending issues in JavaScript files
+4. Use cross-platform path handling in JavaScript
+5. Configure development server for Windows
+6. Handle environment variables in Windows context
+7. Use correct syntax for npm scripts on Windows
+
+## Deployment Considerations
+
+1. Use Windows-specific deployment paths
+2. Consider IIS or Windows Services for hosting PHP
+3. Handle Windows file locking during deployment
+4. Use Windows Task Scheduler instead of cron jobs
+5. Configure Windows Firewall appropriately
+6. Implement proper error logging for Windows environment
+
+7. Consider CI/CD processes compatible with Windows

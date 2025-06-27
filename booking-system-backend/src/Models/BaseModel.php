@@ -24,14 +24,39 @@ class BaseModel {
      */
     public function __construct(string $collectionName) {
         try {
-            // MongoDB connection parameters (consider moving these to config)
-            $mongoHost = 'mongodb://localhost:27017';
-            $mongoDb = 'booking_system';
+            // MongoDB connection parameters from environment/config
+            $dbConfig = require BASE_PATH . '/config/database.php';
+            $mongoConfig = $dbConfig['mongodb'];
+            
+            // Build connection string with authentication
+            if (!empty($mongoConfig['username']) && !empty($mongoConfig['password'])) {
+                $mongoHost = sprintf(
+                    'mongodb://%s:%s@%s:%d/?authSource=admin',
+                    $mongoConfig['username'],
+                    $mongoConfig['password'],
+                    $mongoConfig['host'],
+                    $mongoConfig['port']
+                );
+            } else {
+                $mongoHost = sprintf(
+                    'mongodb://%s:%d',
+                    $mongoConfig['host'],
+                    $mongoConfig['port']
+                );
+            }
+            $mongoDb = $mongoConfig['database'];
             
             error_log("Attempting to connect to MongoDB at {$mongoHost}");
             
+            // Connection options with timeouts
+            $options = [
+                'serverSelectionTimeoutMS' => 5000, // 5 second timeout
+                'connectTimeoutMS' => 5000,
+                'socketTimeoutMS' => 5000
+            ];
+            
             // Connect to MongoDB
-            $this->client = new Client($mongoHost);
+            $this->client = new Client($mongoHost, [], $options);
             $this->database = $this->client->selectDatabase($mongoDb);
             $this->collection = $this->database->selectCollection($collectionName);
             

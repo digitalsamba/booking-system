@@ -8,6 +8,7 @@
       <v-btn v-if="isLoggedIn" to="/" text>Home</v-btn>
       <v-btn v-if="isLoggedIn" to="/bookings" text>Bookings</v-btn>
       <v-btn v-if="isLoggedIn" to="/availability" text>Availability</v-btn>
+      <v-btn v-if="isLoggedIn" to="/branding-settings" text>Branding</v-btn>
       <v-btn v-if="isLoggedIn" to="/profile" text>Profile</v-btn>
       <v-btn v-if="isLoggedIn" @click="logout" text>Logout</v-btn>
       <v-btn v-else to="/login" text>Login</v-btn>

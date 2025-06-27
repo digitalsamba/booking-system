@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { authService } from '../services/api'
+import { authService, userService } from '../services/api'
 
 export const useAuthStore = defineStore('auth', {
   state: () => {
@@ -120,15 +120,20 @@ export const useAuthStore = defineStore('auth', {
       this.error = null
       
       try {
-        // Use the authService directly
-        const response = await authService.updateProfile(userData)
+        // Use the userService instead of authService
+        const response = await userService.updateProfile(userData)
         
         // Log what we received from the server
-        console.log('Server response:', response.data.user);
+        console.log('Server response:', response.data);
         
+        // The actual user object is nested under response.data.data.user
+        const userFromServer = response.data.data?.user; // Correct access pattern
+        // const userFromServer = response.data.user; // Original incorrect access pattern
+
         // Create a new user object combining the response with our sent data
         const updatedUser = {
-          ...response.data.user,
+          ...userFromServer, // Use the correctly accessed user object
+          // ...response.data.user, // <-- Original incorrect line
           // Always include Digital Samba fields from userData, overriding any values from server
           team_id: userData.team_id || '',
           developer_key: userData.developer_key || ''
