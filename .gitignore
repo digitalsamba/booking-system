@@ -135,6 +135,10 @@ dist
 # cursor bits
 .cursor/
 
+# AI development files (keep local)
+.ai_dev/
+CLAUDE.md
+
 # Project documentation (managed in Obsidian vault)
 PROJECT-STATUS.md
 ACTIVE-SESSION.md
